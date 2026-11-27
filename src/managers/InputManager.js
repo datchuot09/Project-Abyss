@@ -43,6 +43,10 @@ export class InputManager extends Phaser.Events.EventEmitter {
     // is pressed AND released within one frame is never lost.
     this.pendingPresses = new Set();
     this.lastDevice = 'keyboard';
+    // Device used for aiming: only the mouse (moving/clicking) or the right
+    // stick change it, so pressing Q/E while aiming with the mouse keeps the
+    // cursor aim. null = keyboard-only (aim follows facing).
+    this.aimDevice = null;
     this.enabled = true;
 
     scene.input.mouse?.disableContextMenu();
@@ -51,7 +55,10 @@ export class InputManager extends Phaser.Events.EventEmitter {
     // Mouse aiming becomes active as soon as the mouse moves or clicks.
     this._onPointer = (pointer) => {
       if (pointer.wasTouch) this.setDevice('touch');
-      else this.setDevice('mouse');
+      else {
+        this.setDevice('mouse');
+        this.aimDevice = 'mouse';
+      }
     };
     this._onPointerDown = (pointer) => {
       this._onPointer(pointer);
@@ -256,16 +263,17 @@ export class InputManager extends Phaser.Events.EventEmitter {
    *  - mouse:   toward the cursor
    */
   getAimVector(originX, originY, camera = this.scene.cameras.main) {
-    if (this.lastDevice === 'gamepad') {
-      const pad = this.getPad();
-      if (pad) {
-        const v = normalizeMove(pad.rightStick.x, pad.rightStick.y, STICK_DEADZONE);
-        const len = Math.hypot(v.x, v.y);
-        if (len > 0) return { x: v.x / len, y: v.y / len };
+    const pad = this.getPad();
+    if (pad) {
+      const v = normalizeMove(pad.rightStick.x, pad.rightStick.y, STICK_DEADZONE);
+      const len = Math.hypot(v.x, v.y);
+      if (len > 0) {
+        this.aimDevice = 'gamepad';
+        return { x: v.x / len, y: v.y / len };
       }
-      return null;
+      if (this.aimDevice === 'gamepad') return null; // stick released: aim with facing
     }
-    if (this.lastDevice === 'mouse') {
+    if (this.aimDevice === 'mouse') {
       const p = this.getAimWorldPoint(camera);
       const dx = p.x - originX;
       const dy = p.y - originY;

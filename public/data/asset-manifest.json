@@ -139,6 +139,55 @@
         "type": "json",
         "key": "monster_abyss_mite_data",
         "url": "data/monsters/abyss_mite.json"
+      },
+      {
+        "type": "json",
+        "key": "levels",
+        "url": "data/progression/levels.json"
+      },
+      {
+        "type": "json",
+        "key": "stamina_config",
+        "url": "data/progression/stamina.json"
+      },
+      {
+        "type": "json",
+        "key": "buffs",
+        "url": "data/progression/buffs.json"
+      },
+      {
+        "type": "json",
+        "key": "status_effects",
+        "url": "data/skills/status_effects.json"
+      },
+      {
+        "type": "spritesheet",
+        "key": "icons",
+        "url": "assets/ui/icons.png",
+        "frameConfig": {
+          "frameWidth": 16,
+          "frameHeight": 16
+        }
+      },
+      {
+        "type": "image",
+        "key": "fx_ring",
+        "url": "assets/effects/ring.png"
+      },
+      {
+        "type": "image",
+        "key": "fx_sigil",
+        "url": "assets/effects/sigil.png"
+      },
+      {
+        "type": "image",
+        "key": "screen_cracks",
+        "url": "assets/ui/screen_cracks.png"
+      },
+      {
+        "type": "image",
+        "key": "vignette_red",
+        "url": "assets/ui/vignette_red.png"
       }
     ]
   },

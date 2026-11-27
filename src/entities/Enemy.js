@@ -44,6 +44,7 @@ export class Enemy extends Combatant {
       return: { update: this.updateReturn },
       hit: { enter: this.enterHit, update: this.updateHit },
       dead: { enter: this.enterDead },
+      finisher: { enter: this.enterFinisher, update: this.updateFinisher },
       ...this.behaviourStates()
     }, 'idle');
   }
@@ -58,7 +59,7 @@ export class Enemy extends Combatant {
   }
 
   get speed() {
-    return this.stats.movementSpeed * this.speedMultiplier;
+    return this.stats.movementSpeed * this.speedMultiplier * this.status.speedMultiplier;
   }
 
   playState(state, { restart = false, timeScale = 1 } = {}) {
@@ -203,9 +204,17 @@ export class Enemy extends Combatant {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.iframeTime = Math.max(0, this.iframeTime - dt);
     if (!this.fsm.is('dead')) {
+      this.updateStatus(dt);
+      if (!this.active || this.fsm.is('dead')) return; // killed by a DoT tick
+      // Frozen / stunned: no thinking, no moving (timers above still run)
+      if (!this.status.canAct) {
+        this.stop(dt, 20);
+        this.hpBarTimer = Math.max(this.hpBarTimer, 0.5);
+        return;
+      }
       this.perceive(dt);
-      // the player died: calm down
-      if (!this.targetAlive() && !this.fsm.is('idle', 'patrol', 'return', 'hit')) this.fsm.set('idle');
+      // the player died: calm down (unless performing the death finisher)
+      if (!this.targetAlive() && !this.fsm.is('idle', 'patrol', 'return', 'hit', 'finisher')) this.fsm.set('idle');
     }
     this.fsm.update(dt);
     this.updateStuck(dt);
@@ -312,15 +321,97 @@ export class Enemy extends Combatant {
   }
 
   // ------------------------------------------------------------------ combat
+  // ------------------------------------------------------------ death finisher
+  /**
+   * Design doc 5.4: the monster that killed the player performs a finisher
+   * that fits its type. Emits FINISHER_DONE when finished.
+   */
+  startFinisher(victim) {
+    if (!this.isTargetable()) return false;
+    this.finisherVictim = victim;
+    this.status.clear();
+    this.refreshStatusVisual();
+    this.fsm.set('finisher');
+    return true;
+  }
+
+  enterFinisher() {
+    this.superArmor = true;
+    this.finisherStep = 0;
+    this.finisherTimer = 0;
+    this.finisherPhase = this.def.finisher?.type === 'execute_shot' ? 'act' : 'approach';
+    this.playState('walk');
+  }
+
+  updateFinisher(dt) {
+    const v = this.finisherVictim;
+    const f = this.def.finisher ?? { type: 'maul', strikes: 2 };
+    const fx = this.ctx.effects;
+    const vc = { x: v.x, y: v.y - 4 };
+    if (this.finisherPhase === 'approach') {
+      const side = this.x < v.x ? -1 : 1;
+      const arrived = this.moveDirect(v.x + side * 10, v.y - 2, this.stats.movementSpeed * 1.2, dt);
+      if (arrived || this.fsm.elapsed > 1.6) {
+        this.finisherPhase = 'act';
+        this.finisherTimer = 0;
+        this.stop(dt, 30);
+        this.setFlipX(v.x < this.x);
+      }
+      return;
+    }
+    this.stop(dt, 30);
+    this.finisherTimer += dt;
+    if (f.type === 'execute_shot') {
+      this.setFlipX(v.x < this.x);
+      if (this.finisherStep === 0) { this.showAttackFrame(0); this.finisherStep = 1; }
+      if (this.finisherStep === 1 && this.finisherTimer > 0.35) { this.showAttackFrame(1); this.finisherStep = 2; }
+      if (this.finisherStep === 2 && this.finisherTimer > 0.9) {
+        this.showAttackFrame(2);
+        this.finisherStep = 3;
+        const c = this.body.center;
+        fx.arrowShot(c.x, c.y - 6, vc.x, vc.y, () => fx.blood(vc.x, vc.y, 1.4));
+      }
+      if (this.finisherStep === 3 && this.finisherTimer > 1.6) this.endFinisher();
+      return;
+    }
+    // maul (ghoul) / burrow (mite): repeated strikes on the body
+    const period = f.type === 'burrow' ? 0.32 : 0.26;
+    const strikes = f.strikes ?? 2;
+    const k = Math.floor(this.finisherTimer / period);
+    if (k > this.finisherStep && this.finisherStep < strikes * 2) {
+      this.finisherStep = k;
+      const striking = k % 2 === 1;
+      this.showAttackFrame(striking ? 2 : 1);
+      if (striking) {
+        fx.blood(vc.x, vc.y, f.type === 'burrow' ? 0.9 : 1.2);
+        fx.shake(0.002, 60);
+      }
+    }
+    if (this.finisherTimer > period * (strikes * 2 + 1)) this.endFinisher();
+  }
+
+  endFinisher() {
+    if (this.finisherDone) return;
+    this.finisherDone = true;
+    this.superArmor = false;
+    this.playState('idle');
+    this.fsm.set('idle');
+    EventBus.emit(Events.FINISHER_DONE, { by: this });
+  }
+
   receiveHit(hit) {
-    if (this.health.isDead || this.isInvulnerable()) return 0;
+    if (this.health.isDead || (!hit.dot && this.isInvulnerable())) return 0;
     const applied = this.health.damage(hit.amount, hit.attacker);
     if (applied <= 0) return 0;
     this.hpBarTimer = 3;
     if (this.health.isDead) {
+      this.status.clear();
+      this.refreshStatusVisual();
       this.fsm.set('dead', hit);
       return applied;
     }
+    if (hit.dot) return applied;
+    this.aggro();
     if (this.fsm.is('idle', 'patrol', 'return', 'alert')) this.lastSeenAt = this.scene.time.now;
     if (this.superArmor) this.applyKnockback(hit, 0.25);
     else if (hit.hitstun > 0) {

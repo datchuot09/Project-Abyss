@@ -2,7 +2,7 @@
 
 Action Roguelite · Dark Fantasy · Pixel Art · Top-down — **Phaser 3.90 + JavaScript ES Modules + Vite 7**
 
-> Trạng thái hiện tại: **Giai đoạn 2 – Player and Combat (hoàn thành)**. Xem [Trạng thái giai đoạn](#trạng-thái-giai-đoạn).
+> Trạng thái hiện tại: **Giai đoạn 3 – HUD, EXP, Stamina, Level Up, Game Over (hoàn thành)**, kèm kỹ năng Q/E/R và hiệu ứng trạng thái. Xem [Trạng thái giai đoạn](#trạng-thái-giai-đoạn).
 
 ## Chạy dự án
 
@@ -14,7 +14,7 @@ npm run dev        # http://localhost:5173
 npm run build      # bản production -> dist/
 npm run preview    # chạy thử bản production
 npm test           # unit test (logic thuần, không cần trình duyệt)
-npm run smoke      # test end-to-end trong Chromium: GĐ1 + combat/AI GĐ2 (cần Playwright, xem dưới)
+npm run smoke      # test end-to-end trong Chromium: GĐ1-3 (cần Playwright, xem dưới)
 npm run assets     # tạo các asset placeholder còn thiếu (không ghi đè file đã có)
 ```
 
@@ -31,13 +31,17 @@ Smoke test dùng Playwright nhưng không đưa vào dependency để bản cài
 | Chuột trái / RT | Chém kiếm – combo 3 đòn, đòn 3 mạnh và đẩy lùi xa |
 | Chuột phải / LT | Arcane Bolt – đạn phép (sát thương phép, hồi chiêu 0.7s) |
 | Space / A | Lộn tránh (i-frame 0.24s, huỷ được phần hồi đòn của nhát chém) |
-| Enter / Space / A | Chọn trong menu; "Rise again" khi gục ngã |
+| Q / LB | Rune Rush – lướt xuyên kẻ địch, gây sát thương vật lý, bất tử khi lướt (hồi 6s) |
+| E / RB | Frost Sigil – ấn phù băng tại điểm ngắm, nổ AOE: sát thương băng + Slow, 30% Freeze (hồi 9s) |
+| R / Y | Abyssal Eclipse (Ultimate) – tụ lực rồi nổ bóng tối quanh người: sát thương lớn + Stun (hồi 40s) |
+| ESC / Start | Pause Menu (Resume / Abandon Run) |
+| Enter / Space / A | Chọn trong menu, chọn buff khi lên cấp |
+| A/D hoặc chuột | Chuyển giữa các thẻ buff |
 | F11 | Bật/tắt fullscreen |
 | F3 | Debug overlay (FPS, scale, vị trí, trạng thái, HP, số quái, hitbox) |
-| ESC | Về Main Menu (tạm thời, đến khi có Pause Menu) |
 
-Bảng phím đầy đủ theo thiết kế (Q/E/R, I, F…) có trong `src/data/inputBindings.js`, remap qua
-`InputManager.rebind()`; Q/E/R/I/F chưa có chức năng (xem trạng thái).
+Bảng phím đầy đủ có trong `src/data/inputBindings.js`, remap qua `InputManager.rebind()`.
+I (Inventory) và F (Interact) chưa có chức năng (GĐ5/GĐ4).
 
 ## Kiến trúc
 
@@ -49,14 +53,21 @@ public/
     characters/*.json     Chỉ số, hitbox, sprite, animation, combo/dodge/cast của nhân vật (data-driven)
     monsters/*.json       Chỉ số, AI (brute/archer/skitter), tầm phát hiện, đòn đánh, kỹ năng của quái
     skills/projectiles.json  Tốc độ, bán kính va chạm, thời gian sống, hiệu ứng của đạn
+    skills/status_effects.json  Burn, Poison, Slow, Freeze, Stun, Root (loại, thời lượng tối đa, miễn nhiễm)
+    progression/levels.json     Đường cong EXP: expToNext = round(20 × level^1.35)
+    progression/buffs.json      9 buff khi lên cấp (giá trị, số stack tối đa) + giới hạn chỉ số
+    progression/stamina.json    Các mốc Stamina và hình phạt
     dungeons/*.json       Tilemap định dạng Tiled (mở/sửa trực tiếp bằng Tiled)
 src/
   core/      constants, EventBus, Events, SceneKeys, SceneRouter, PixelScaler, math, services
   managers/  AssetManager, InputManager, DisplayManager, SettingsManager
   world/     DungeonMap (Tiled), MapValidator, FlowField (thuần), Navigation, CameraController, LightingLayer
-  systems/   DamageCalculator, Health, StateMachine (thuần), CombatSystem, ProjectileSystem, EffectsSystem
+  systems/   DamageCalculator, Health, StateMachine, StatusEffects, Stamina, StatCalculator, RunState (thuần),
+             CombatSystem, ProjectileSystem, EffectsSystem
+  managers/  … + RunManager (điểm duy nhất thay đổi EXP / buff / Stamina)
   entities/  Combatant (nền chung), Player, Enemy (AI nền), enemies/ (Ghoul, BoneArcher, AbyssMite), EnemyFactory
-  ui/        HUD (avatar + HP), MenuList, DebugOverlay, theme
+  ui/        HUD (avatar, HP/EXP/Stamina, buff, thanh kỹ năng, overlay kiệt sức), MenuList, DebugOverlay, theme
+  scenes/    … + LevelUpScene, PauseScene (overlay), GameOverScene
   scenes/    Boot, Preload, MainMenu, Loading, Dungeon (+ index.js đăng ký scene)
   data/      inputBindings (bảng phím mặc định)
 tools/       generate-placeholder-assets.mjs (+ art/), smoke-test.mjs (+ e2e/combat.mjs)
@@ -109,6 +120,30 @@ nhân vật "The Wanderer" 24×24 (idle/walk × 3 hướng), tileset dungeon 16�
 font bitmap pixel tự thiết kế, và tilemap thử nghiệm. Đây là **placeholder có tổ chức cho giai đoạn
 phát triển**; Giai đoạn 10 thay bằng art hoàn chỉnh. Script không ghi đè file đã tồn tại trừ khi `--force`.
 
+### Tiến trình trong Run (GĐ3)
+- **EXP:** hạ quái nhận EXP (Ghoul 12, Archer 10, Mite 6). Đủ EXP → game **tạm dừng**, hiện 3 buff ngẫu nhiên
+  (không trùng, không hiện buff đã đầy stack), chọn 1, áp dụng ngay rồi chơi tiếp; nhiều cấp cùng lúc được
+  xử lý lần lượt. Buff chỉ tồn tại trong Run.
+- **Chỉ số cuối:** `(gốc + tổng cộng) × (1 + tổng %)` cho từng chỉ số, stack bị giới hạn theo `maxStacks`, sau đó
+  áp giới hạn (Attack Speed ≤ 1.6, Crit ≤ 50%, CDR ≤ 40%, Move Speed ≤ 130% gốc). Max HP tăng thì hồi phần chênh.
+- **Stamina** (mục 5.3) – chỉ thay đổi qua `RunManager.changeStamina()`, sát thương thường **không** làm giảm:
+
+  | Stamina | Hiệu ứng |
+  |---|---|
+  | > 50 (kể cả 50) | Bình thường |
+  | < 50 | −30% sát thương gây ra |
+  | ≤ 0 | −50% sát thương (thay thế mức −30%, không cộng dồn) |
+  | ≤ −50 | thêm −20% tốc độ di chuyển |
+  | ≤ −100 | viền đỏ nhấp nháy 4 góc + vết nứt màn hình, duy trì khi tiếp tục âm |
+
+  "Giảm 30 / 50 sát thương" trong spec được hiểu là **phần trăm** (trừ thẳng 30 điểm sẽ đưa mọi đòn về 0);
+  đổi trong `stamina.json` nếu cần. Các nguồn làm giảm Stamina (bẫy, lời nguyền, bàn thờ) đến ở GĐ4/GĐ7.
+- **Trạng thái:** áp lại thì làm mới thời gian (lấy dài hơn) và giữ mức mạnh hơn – không cộng dồn; Freeze/Stun
+  có 2s miễn nhiễm sau khi hết để không bị khống chế liên hoàn; DoT bỏ qua i-frame nhưng không gây khựng.
+- **Cái chết (mục 5.4):** nhân vật ngã → quái vừa hạ gục thực hiện đòn kết liễu theo loại (Ghoul cắn xé,
+  Archer bắn phát kết liễu, Mite đục khoét) kèm máu và vũng máu → Game Over với tóm tắt Run → "Rise Again"
+  bắt đầu Run mới.
+
 ## Trạng thái giai đoạn
 
 ### Giai đoạn 1 – Core Framework ✅
@@ -116,28 +151,29 @@ Scene flow, Asset/Input/Display Manager, tilemap Tiled có kiểm tra spawn, di 
 pixel-perfect integer scaling + letterbox + fullscreen, Loading Screen, ánh sáng cơ bản.
 
 ### Giai đoạn 2 – Player and Combat ✅
+Combo kiếm, Arcane Bolt, dodge i-frame, hitbox/hurtbox thật, knockback/hitstun, sát thương vật lý/phép/chí
+mạng/phòng thủ, 3 AI quái riêng biệt (Ghoul, Bone Archer, Abyss Mite) có dẫn đường tránh vật cản; bổ sung ở
+lượt này: **kỹ năng Q/E/R + Ultimate, sát thương nguyên tố, hiệu ứng trạng thái, AOE**.
+
+### Giai đoạn 3 – HUD ✅
 | Hạng mục | Trạng thái |
 |---|---|
-| Player: animation idle/walk/run/attack/cast/dodge/hit/death × 3 hướng | Xong |
-| Tấn công: combo kiếm 3 đòn theo hướng ngắm + Arcane Bolt (đạn phép) | Xong |
-| Dodge roll với i-frame, cooldown, huỷ phần hồi đòn | Xong |
-| Hitbox/Hurtbox thật, Knockback, Hitstun, Invincibility Frames, Projectile | Xong |
-| Sát thương vật lý/phép, chí mạng, phòng thủ, giảm sát thương (data-driven) | Xong |
-| Enemy AI: 3 loại hành vi khác nhau, có Skill/Retreat, dẫn đường tránh vật cản, gỡ kẹt | Xong |
-| HUD: avatar + thanh HP (vệt sát thương, cảnh báo HP thấp) | Xong (EXP/Stamina ở GĐ3) |
-| Hiệu ứng: số sát thương, chí mạng, hit flash, screen shake, tia lửa, vệt chém, vệt đạn, nổ khi chết | Xong |
-| Gục ngã: animation chết → màn "You have fallen" → Enter chơi lại tầng | Bản tạm (Game Over + kết liễu ở GĐ3) |
-| Thông báo khi dọn sạch quái | Xong (điều kiện Clear phòng ở GĐ4) |
+| HUD góc trên trái: avatar + cấp, thanh HP, EXP, Stamina | Xong |
+| HP: animation giảm máu, cảnh báo HP thấp, Death Sequence khi về 0 | Xong |
+| EXP từ quái, Level Up tạm dừng game, 3 buff chọn 1, stacking + giới hạn | Xong |
+| Stamina với đủ các mốc, hình phạt tính đúng, overlay ≤ −100 | Xong |
+| Death Sequence: kết liễu theo loại quái + máu, Game Over + tóm tắt Run | Xong |
+| Pause Menu (ESC) | Xong |
+| Thanh kỹ năng + hồi chiêu, hàng buff đang có | Xong |
 
 ### Chưa triển khai (theo lộ trình)
-- Kỹ năng Q/E, Ultimate R, Skill Tree: chưa có (GĐ9 cho Skill Tree; kỹ năng chủ động sẽ thêm cùng
-  hệ thống kỹ năng). Inventory (I), tương tác (F): GĐ5/GĐ4.
-- Elemental Damage và Status Effects (Burn, Slow, Freeze…): trường `element` đã có trong dữ liệu
-  sát thương, hiệu ứng triển khai cùng Resonance ở GĐ6.
-- Death Sequence đầy đủ (quái kết liễu, máu) và GameOverScene: GĐ3. EXP/Level Up/Stamina: GĐ3.
-- Scene Hub, Boss, Victory: GĐ8/9. Âm thanh: GĐ10. Save: GĐ11. Electron/Capacitor: GĐ12.
+- Nguồn trừ Stamina (bẫy GĐ4, lời nguyền/bàn thờ GĐ7); EXP từ Boss/Event (GĐ7/GĐ8).
+- HP/Stamina mang sang tầng tiếp theo: lưu trong RunState khi có chuyển tầng (GĐ4).
+- Resonance theo nguyên tố (GĐ6) – hệ nguyên tố và trạng thái đã sẵn sàng để dùng.
+- Inventory (I), tương tác (F), phòng/rương (GĐ4–5); Skill Tree & nâng cấp vĩnh viễn (GĐ9).
+- Scene Hub, Boss, Victory (GĐ8/9); âm thanh (GĐ10); Save IndexedDB, lưu kết quả Run (GĐ11); Electron (GĐ12).
 
 ### Hạn chế đã biết
 - Quái chỉ có sprite một hướng (lật trái/phải). Art vẫn là placeholder tự vẽ, hoàn thiện ở GĐ10.
-- Ngắm bằng tay cầm (right stick) đã viết nhưng chưa kiểm thử với tay cầm thật (môi trường test không có).
+- Ngắm bằng tay cầm (right stick) và nút tay cầm cho Q/E/R đã viết nhưng chưa kiểm thử với tay cầm thật.
 - Nhân vật vẽ đè lên khối cột khi đứng phía trên cột; tường hai bên chưa có viền (GĐ4/GĐ10).

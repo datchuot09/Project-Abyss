@@ -1,7 +1,7 @@
 // Global, engine-independent constants. Pure module (safe to import in Node tests).
 export const GAME_TITLE = 'PROJECT ABYSS';
-export const GAME_VERSION = '0.1.0';
-export const BUILD_PHASE = 'Phase 1 - Core Framework';
+export const GAME_VERSION = '0.3.0';
+export const BUILD_PHASE = 'Phase 3 - HUD & Progression';
 
 // Logical resolution (16:9). Everything is authored at this size and scaled up.
 export const GAME_WIDTH = 480;

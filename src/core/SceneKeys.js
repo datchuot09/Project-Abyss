@@ -9,6 +9,8 @@ export const SceneKeys = Object.freeze({
   DUNGEON: 'DungeonScene',
   BOSS: 'BossScene', // Phase 8
   LOADING: 'LoadingScene',
-  GAME_OVER: 'GameOverScene', // Phase 3
+  GAME_OVER: 'GameOverScene',
+  LEVEL_UP: 'LevelUpScene', // overlay
+  PAUSE: 'PauseScene', // overlay
   VICTORY: 'VictoryScene' // Phase 8
 });

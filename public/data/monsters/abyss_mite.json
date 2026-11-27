@@ -112,7 +112,20 @@
       "multiplier": 1.0,
       "type": "physical",
       "knockback": 110,
-      "hitstun": 0.15
+      "hitstun": 0.15,
+      "status": [
+        {
+          "id": "poison",
+          "duration": 3,
+          "potency": 3,
+          "chance": 0.6
+        }
+      ]
     }
+  },
+  "exp": 6,
+  "finisher": {
+    "type": "burrow",
+    "strikes": 2
   }
 }

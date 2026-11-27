@@ -1,0 +1,42 @@
+{
+  "max": 100,
+  "floor": -300,
+  "comment": "Design doc 5.3. Penalties are percentages (0.3 = -30% damage dealt). Strongest rule per category wins; they never add up.",
+  "damage": [
+    {
+      "below": 50,
+      "penalty": 0.3
+    },
+    {
+      "atOrBelow": 0,
+      "penalty": 0.5
+    }
+  ],
+  "speed": [
+    {
+      "atOrBelow": -50,
+      "penalty": 0.2
+    }
+  ],
+  "critical": {
+    "atOrBelow": -100
+  },
+  "tiers": [
+    {
+      "id": "broken",
+      "atOrBelow": -100
+    },
+    {
+      "id": "collapsing",
+      "atOrBelow": -50
+    },
+    {
+      "id": "exhausted",
+      "atOrBelow": 0
+    },
+    {
+      "id": "weary",
+      "below": 50
+    }
+  ]
+}

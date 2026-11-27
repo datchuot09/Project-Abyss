@@ -1,0 +1,6 @@
+{
+  "base": 20,
+  "exponent": 1.35,
+  "maxLevel": 60,
+  "comment": "expToNext(level) = round(base * level^exponent)"
+}

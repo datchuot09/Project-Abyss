@@ -3,5 +3,6 @@
 // which keeps the dependency graph acyclic.
 export const services = {
   settings: null,
-  display: null
+  display: null,
+  run: null // RunState of the current run (managers/RunManager.js)
 };

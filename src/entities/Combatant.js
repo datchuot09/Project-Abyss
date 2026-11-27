@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { DEPTH } from '../core/constants.js';
 import { parseTiledColor } from '../core/math.js';
 import { Health } from '../systems/Health.js';
+import { StatusEffects } from '../systems/StatusEffects.js';
+import { EventBus } from '../core/EventBus.js';
+import { Events } from '../core/Events.js';
 
 /**
  * Shared base for anything that fights: physics body (= hurtbox), stats,
@@ -20,6 +23,7 @@ export class Combatant extends Phaser.Physics.Arcade.Sprite {
     this.health = new Health(this.stats.maxHp);
     this.iframeTime = 0;
     this.bloodColor = parseTiledColor(def.bloodColor, 0x7a1020);
+    this.status = new StatusEffects(scene.cache.json.get('status_effects'));
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -46,6 +50,40 @@ export class Combatant extends Phaser.Physics.Arcade.Sprite {
 
   isInvulnerable() {
     return this.iframeTime > 0;
+  }
+
+  /** Apply a status effect (freeze, slow, poison...). Returns true if it took. */
+  applyStatus(id, opts) {
+    if (this.health.isDead) return false;
+    const ok = this.status.apply(id, opts);
+    if (ok) {
+      EventBus.emit(Events.STATUS_APPLIED, { target: this, id });
+      if (id === 'freeze' || id === 'stun') this.onDisabled?.(id);
+    }
+    return ok;
+  }
+
+  /** Tick status effects; DoT damage goes through CombatSystem.applyDot. */
+  updateStatus(dt) {
+    if (this.health.isDead) return;
+    const { ticks, expired } = this.status.update(dt);
+    for (const t of ticks) this.ctx.combat.applyDot(this, t);
+    if (expired.length) this.refreshStatusVisual();
+    else if (this.status.active.size) this.refreshStatusVisual();
+  }
+
+  /** Freeze shows as an icy tint and halts animation. */
+  refreshStatusVisual() {
+    const frozen = this.status.has('freeze');
+    if (frozen && !this._frozenVisual) {
+      this._frozenVisual = true;
+      this.anims.pause();
+      this.setTint(0x9fe8ff);
+    } else if (!frozen && this._frozenVisual) {
+      this._frozenVisual = false;
+      this.anims.resume();
+      this.clearTint();
+    }
   }
 
   get center() {

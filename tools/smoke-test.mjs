@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { combatChecks } from './e2e/combat.mjs';
+import { progressionChecks } from './e2e/progression.mjs';
 
 const PROD = process.argv.includes('--prod');
 const shotsIdx = process.argv.indexOf('--shots');
@@ -211,16 +212,25 @@ try {
   await combatChecks({ page, check });
   await shot('06-combat');
 
-  // ESC -> menu, re-enter: scene restart must not leak listeners
-  await page.keyboard.press('Escape');
-  await sceneActive('MainMenuScene');
-  await page.waitForTimeout(300);
+  // Phase 3: HUD, EXP/level-up, stamina, skills, status effects, pause
+  console.log('--- Phase 3: progression ---');
+  await progressionChecks({ page, check, shot });
+
+  // ESC -> Pause -> Abandon Run (confirm) -> menu; re-enter: scene restarts must not leak listeners
+  const abandon = async () => {
+    await page.keyboard.press('Escape');
+    await sceneActive('PauseScene');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await sceneActive('MainMenuScene');
+    await page.waitForTimeout(300);
+  };
+  await abandon();
   await page.keyboard.press('Enter');
   await sceneActive('DungeonScene');
   await page.waitForTimeout(300);
-  await page.keyboard.press('Escape');
-  await sceneActive('MainMenuScene');
-  await page.waitForTimeout(300);
+  await abandon();
   const listenersAfter = await page.evaluate(() => window.__ABYSS__.EventBus.eventNames().map((n) => `${n}:${window.__ABYSS__.EventBus.listenerCount(n)}`).join(','));
   check('No EventBus listener leak after scene restarts', listenersBefore === listenersAfter, `${listenersBefore || '(none)'} vs ${listenersAfter || '(none)'}`);
   const objects = await page.evaluate(() => window.__ABYSS__.game.scene.getScene('MainMenuScene').children.length);

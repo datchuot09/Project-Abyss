@@ -6,6 +6,7 @@ import { EventBus, listen } from '../core/EventBus.js';
 import { Events } from '../core/Events.js';
 import { AssetManager } from '../managers/AssetManager.js';
 import { InputManager } from '../managers/InputManager.js';
+import { RunManager } from '../managers/RunManager.js';
 import { DungeonMap } from '../world/DungeonMap.js';
 import { Navigation } from '../world/Navigation.js';
 import { CameraController } from '../world/CameraController.js';
@@ -20,7 +21,8 @@ import { HUD } from '../ui/HUD.js';
 import { UI } from '../ui/theme.js';
 
 /**
- * A dungeon floor: tilemap, lighting, player, enemies and combat.
+ * A dungeon floor: tilemap, lighting, player, enemies and combat, run
+ * progression (EXP / level-up / stamina) and the death sequence.
  * Room flow (clear conditions, doors, chests) arrives in Phase 4.
  *
  * data: { floorId, floorNumber }
@@ -34,6 +36,7 @@ export class DungeonScene extends Phaser.Scene {
     this.floorId = data.floorId ?? 'test_chamber';
     this.floorNumber = data.floorNumber ?? 1;
     this.defeated = false;
+    this.levelUpRequested = false;
   }
 
   create() {
@@ -55,12 +58,15 @@ export class DungeonScene extends Phaser.Scene {
       defs: AssetManager.getProjectiles(this)
     });
     const ctx = { combat: this.combat, projectiles: this.projectiles, effects: this.effects, nav: this.navigation, target: null };
+    this.run = RunManager.ensureRun(this);
+    this.run.floor = this.floorNumber;
 
     // Player
     const character = AssetManager.getCharacter(this, 'wanderer');
     const spawn = this.dungeon.playerSpawn;
     this.player = new Player(this, spawn.x, spawn.y, character, ctx);
     this.physics.add.collider(this.player, this.dungeon.layers.walls);
+    this.player.recomputeStats(this.run, RunManager.buffDefs(this));
     ctx.target = this.player;
 
     // Enemies
@@ -82,29 +88,29 @@ export class DungeonScene extends Phaser.Scene {
       bounds: { width: this.dungeon.widthInPixels, height: this.dungeon.heightInPixels },
       target: this.player
     });
-    this.hud = new HUD(this, this.player);
+    this.input_ = new InputManager(this);
+    this.hud = new HUD(this, this.player, this.run, { keyLabel: (a) => this.keyLabel(a) });
     this.crosshair = this.add.image(0, 0, 'crosshair').setScrollFactor(0).setDepth(DEPTH.UI + 5).setVisible(false);
     this.input.setDefaultCursor('none');
 
     // Input
-    this.input_ = new InputManager(this);
     this.debug = new DebugOverlay(this, { player: this.player, map: this.dungeon, input: this.input_ });
     this.input_.on('pressed', (action) => {
       if (action === 'debug') this.debug.toggle();
-      if (this.defeated) {
-        if (action === 'confirm') this.scene.restart({ floorId: this.floorId, floorNumber: this.floorNumber });
-        if (action === 'pause' || action === 'back') SceneRouter.goTo(this, SceneKeys.MAIN_MENU);
-        return;
-      }
-      // Temporary until the Pause Menu exists (Phase 3 UI): ESC returns to the main menu.
-      if (action === 'pause') SceneRouter.goTo(this, SceneKeys.MAIN_MENU);
+      if (action === 'pause' && !this.defeated) this.openPause();
     });
 
     listen(this, Events.ENTITY_DIED, this.onEntityDied, this);
     listen(this, Events.PLAYER_DIED, this.onPlayerDied, this);
+    listen(this, Events.COMBAT_HIT, this.onCombatHit, this);
+    listen(this, Events.RUN_LEVEL_UP, () => (this.levelUpRequested = true), this);
+    listen(this, Events.RUN_BUFFS_CHANGED, this.onBuffChosen, this);
+    listen(this, Events.STAMINA_CHANGED, () => this.player.recomputeStats(this.run, RunManager.buffDefs(this)), this);
+    this.events.on('resume', this.onResume, this);
 
     this.showBanner(`Floor ${this.floorNumber} - ${floor.name}`, UI.accent);
     this.events.once('shutdown', () => {
+      this.events.off('resume', this.onResume, this);
       this.input.setDefaultCursor('default');
       this.combat.destroy();
       this.dungeon.destroy();
@@ -117,26 +123,81 @@ export class DungeonScene extends Phaser.Scene {
     return this.enemies.getChildren().filter((e) => e.isTargetable());
   }
 
+  keyLabel(action) {
+    const name = this.input_.getKeyBindings()[action]?.[0] ?? '?';
+    return { MOUSE_LEFT: 'LMB', MOUSE_RIGHT: 'RMB', MOUSE_MIDDLE: 'MMB', SPACE: 'SPC' }[name] ?? name;
+  }
+
   onEntityDied({ entity }) {
     if (entity.team !== 'enemy') return;
+    this.run.kills++;
+    const exp = entity.def.exp ?? 0;
+    if (exp > 0) {
+      this.effects.number(entity.x, entity.y - 18, `+${exp} EXP`, 0xd9b25f);
+      RunManager.grantExp(exp, entity.id);
+    }
     if (this.aliveEnemies.length === 0) {
       EventBus.emit(Events.ENEMIES_CLEARED, { floorId: this.floorId });
       this.showBanner('The chamber falls silent', UI.accentHot);
     }
   }
 
-  onPlayerDied() {
+  onCombatHit({ team, damage }) {
+    if (team === 'enemy') this.run.damageDealt += damage;
+    else if (team === 'player') this.run.damageTaken += damage;
+  }
+
+  onBuffChosen({ chosen }) {
+    this.player.recomputeStats(this.run, RunManager.buffDefs(this));
+    if (chosen?.instantHeal) this.player.heal(this.player.health.max * chosen.instantHeal, 'buff');
+    this.pendingLevelFx = true;
+  }
+
+  openLevelUp() {
+    this.levelUpRequested = false;
+    if (this.defeated || this.player.isDead || this.run.pendingLevelUps <= 0) return;
+    this.scene.pause();
+    this.scene.launch(SceneKeys.LEVEL_UP, { returnTo: this.scene.key });
+  }
+
+  openPause() {
+    this.scene.pause();
+    this.scene.launch(SceneKeys.PAUSE, { returnTo: this.scene.key });
+  }
+
+  onResume() {
+    this.input.setDefaultCursor('none');
+    this.input_.setEnabled(true);
+    if (this.pendingLevelFx) {
+      this.pendingLevelFx = false;
+      this.effects.levelUp(this.player);
+    }
+  }
+
+  /** Death sequence (design doc 5.4): fall -> killer's finisher + blood -> Game Over. */
+  onPlayerDied({ killer }) {
+    if (this.defeated) return;
     this.defeated = true;
-    this.time.delayedCall(500, () => {
-      const veil = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x050307, 1).setOrigin(0).setScrollFactor(0)
-        .setDepth(DEPTH.UI + 10).setAlpha(0);
-      const title = this.add.bitmapText(GAME_WIDTH / 2, 110, FONT_KEY, 'YOU HAVE FALLEN', 11).setOrigin(0.5).setScale(2)
-        .setTint(UI.danger).setScrollFactor(0).setDepth(DEPTH.UI + 11).setAlpha(0);
-      const hint = this.add.bitmapText(GAME_WIDTH / 2, 140, FONT_KEY, 'Enter - Rise again      Esc - Main menu', 11).setOrigin(0.5)
-        .setTint(UI.textDim).setScrollFactor(0).setDepth(DEPTH.UI + 11).setAlpha(0);
-      this.tweens.add({ targets: veil, alpha: 0.75, duration: 700 });
-      this.tweens.add({ targets: [title, hint], alpha: 1, duration: 500, delay: 400 });
-    });
+    RunManager.endRun();
+    const p = this.player;
+    this.effects.blood(p.x, p.y - 4, 1);
+    let finished = false;
+    const toGameOver = () => {
+      if (finished) return;
+      finished = true;
+      this.time.delayedCall(500, () => {
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start(SceneKeys.GAME_OVER, { summary: this.run.toJSON(), cause: killer?.def?.name ?? 'the abyss' });
+        });
+        this.cameras.main.fadeOut(900, 30, 0, 6);
+      });
+    };
+    if (killer && killer.startFinisher && killer.distanceTo(p) < 260 && killer.startFinisher(p)) {
+      listen(this, Events.FINISHER_DONE, toGameOver, this);
+      this.time.delayedCall(5000, toGameOver); // safety net
+    } else {
+      this.time.delayedCall(900, toGameOver);
+    }
   }
 
   showBanner(text, tint) {
@@ -169,12 +230,14 @@ export class DungeonScene extends Phaser.Scene {
     for (const enemy of this.enemies.getChildren()) enemy.think(dt);
     this.combat.update(dt);
     this.projectiles.update(dt);
+    this.effects.updateStatusVisuals(this.combat.combatants, dt);
 
     const pointer = this.input.activePointer;
-    this.crosshair.setVisible(this.input_.lastDevice === 'mouse' && !this.defeated);
+    this.crosshair.setVisible(this.input_.aimDevice === 'mouse' && !this.defeated);
     this.crosshair.setPosition(Math.round(pointer.x), Math.round(pointer.y));
 
     this.hud.update(dt);
     this.debug.update();
+    if (this.levelUpRequested) this.openLevelUp();
   }
 }

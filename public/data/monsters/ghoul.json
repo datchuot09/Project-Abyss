@@ -120,5 +120,10 @@
     "roarTime": 0.6,
     "speedMultiplier": 1.35,
     "cooldownMultiplier": 0.7
+  },
+  "exp": 12,
+  "finisher": {
+    "type": "maul",
+    "strikes": 3
   }
 }

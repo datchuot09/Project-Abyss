@@ -1,0 +1,121 @@
+{
+  "buffs": {
+    "physical_damage": {
+      "id": "physical_damage",
+      "name": "Honed Edge",
+      "stat": "physicalDamage",
+      "mode": "mult",
+      "value": 0.12,
+      "maxStacks": 5,
+      "description": "+12% Physical Damage",
+      "icon": 5,
+      "weight": 1
+    },
+    "magic_damage": {
+      "id": "magic_damage",
+      "name": "Arcane Insight",
+      "stat": "magicDamage",
+      "mode": "mult",
+      "value": 0.12,
+      "maxStacks": 5,
+      "description": "+12% Magic Damage",
+      "icon": 6,
+      "weight": 1
+    },
+    "max_hp": {
+      "id": "max_hp",
+      "name": "Iron Will",
+      "stat": "maxHp",
+      "mode": "mult",
+      "value": 0.12,
+      "maxStacks": 5,
+      "description": "+12% Max HP",
+      "icon": 7,
+      "weight": 1
+    },
+    "attack_speed": {
+      "id": "attack_speed",
+      "name": "Quickened Blade",
+      "stat": "attackSpeed",
+      "mode": "add",
+      "value": 0.08,
+      "maxStacks": 5,
+      "description": "+8% Attack Speed",
+      "icon": 8,
+      "weight": 1
+    },
+    "move_speed": {
+      "id": "move_speed",
+      "name": "Shadow Step",
+      "stat": "movementSpeed",
+      "mode": "mult",
+      "value": 0.06,
+      "maxStacks": 4,
+      "description": "+6% Movement Speed",
+      "icon": 9,
+      "weight": 1
+    },
+    "crit_rate": {
+      "id": "crit_rate",
+      "name": "Keen Eye",
+      "stat": "critRate",
+      "mode": "add",
+      "value": 0.05,
+      "maxStacks": 6,
+      "description": "+5% Critical Rate",
+      "icon": 10,
+      "weight": 1
+    },
+    "cooldown": {
+      "id": "cooldown",
+      "name": "Flowing Runes",
+      "stat": "cooldownReduction",
+      "mode": "add",
+      "value": 0.06,
+      "maxStacks": 5,
+      "description": "-6% Cooldowns",
+      "icon": 11,
+      "weight": 1
+    },
+    "healing": {
+      "id": "healing",
+      "name": "Second Wind",
+      "stat": "healingMultiplier",
+      "mode": "add",
+      "value": 0.1,
+      "maxStacks": 4,
+      "description": "Heal 35% HP now, +10% healing",
+      "icon": 12,
+      "weight": 1,
+      "instantHeal": 0.35
+    },
+    "skill_damage": {
+      "id": "skill_damage",
+      "name": "Runic Mastery",
+      "stat": "skillDamage",
+      "mode": "add",
+      "value": 0.15,
+      "maxStacks": 5,
+      "description": "+15% Skill Damage",
+      "icon": 13,
+      "weight": 1
+    }
+  },
+  "caps": {
+    "attackSpeed": {
+      "max": 1.6
+    },
+    "critRate": {
+      "max": 0.5
+    },
+    "cooldownReduction": {
+      "max": 0.4
+    },
+    "movementSpeed": {
+      "maxOfBase": 1.3
+    },
+    "healingMultiplier": {
+      "max": 2
+    }
+  }
+}

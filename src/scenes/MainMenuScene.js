@@ -7,6 +7,7 @@ import { listen } from '../core/EventBus.js';
 import { Events } from '../core/Events.js';
 import { InputManager } from '../managers/InputManager.js';
 import { MenuList } from '../ui/MenuList.js';
+import { RunManager } from '../managers/RunManager.js';
 import { UI } from '../ui/theme.js';
 
 export class MainMenuScene extends Phaser.Scene {
@@ -35,6 +36,7 @@ export class MainMenuScene extends Phaser.Scene {
           label: 'Enter the Abyss',
           onSelect: () => {
             this.menu.setEnabled(false);
+            RunManager.startNewRun(this);
             SceneRouter.goTo(this, SceneKeys.LOADING, { floorId: 'test_chamber', floorNumber: 1, next: SceneKeys.DUNGEON });
           }
         },

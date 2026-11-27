@@ -1,71 +1,7 @@
 // Phase 2 end-to-end combat checks. Runs inside smoke-test.mjs with the same
 // page. Each scenario restarts DungeonScene for a clean, deterministic state.
 
-/* Helpers installed on window.T inside the page */
-function installHelpers() {
-  const A = window.__ABYSS__;
-  window.T = {
-    S: () => A.game.scene.getScene('DungeonScene'),
-    events: [],
-    handlers: [],
-    listen() {
-      const E = A.EventBus;
-      for (const name of ['combat:hit', 'combat:evaded', 'entity:died', 'player:died', 'enemies:cleared']) {
-        const fn = (e) => window.T.events.push({ name, team: e?.team, type: e?.type, source: e?.source, damage: e?.damage, target: e?.target?.id ?? e?.entity?.id });
-        E.on(name, fn);
-        window.T.handlers.push([name, fn]);
-      }
-    },
-    unlisten() {
-      for (const [name, fn] of window.T.handlers) A.EventBus.off(name, fn);
-      window.T.handlers.length = 0;
-    },
-    count(name, filter = () => true) {
-      return window.T.events.filter((e) => e.name === name && filter(e)).length;
-    },
-    /** keep only enemies of the given ids (first match each), destroy the rest */
-    keep(...ids) {
-      const s = window.T.S();
-      const kept = [];
-      for (const e of [...s.enemies.getChildren()]) {
-        const i = ids.indexOf(e.id);
-        if (i >= 0) { ids.splice(i, 1); kept.push(e); } else e.destroy();
-      }
-      return kept;
-    },
-    place(entity, x, y) {
-      entity.body.reset(x, y);
-      entity.body.setVelocity(0, 0);
-    },
-    tile: (t) => t * 16 + 8,
-    screenOf(x, y) {
-      const s = window.T.S();
-      const cam = s.cameras.main;
-      const r = document.querySelector('canvas').getBoundingClientRect();
-      const z = r.width / 480;
-      return { x: r.left + (x - cam.worldView.x) * z, y: r.top + (y - cam.worldView.y) * z };
-    },
-    inWall(entity) {
-      const c = entity.body.center;
-      return !window.T.S().dungeon.isWalkableWorld(c.x, c.y);
-    }
-  };
-}
-
-async function restart(page) {
-  await page.evaluate(() => new Promise((resolve) => {
-    window.__ABYSS__.EventBus.once('floor:loaded', () => resolve());
-    window.T.events.length = 0;
-    window.T.S().scene.restart({ floorId: 'test_chamber', floorNumber: 1 });
-  }));
-  await page.waitForTimeout(300);
-}
-
-async function aimAt(page, wx, wy) {
-  const p = await page.evaluate(([x, y]) => window.T.screenOf(x, y), [wx, wy]);
-  await page.mouse.move(p.x, p.y);
-  await page.waitForTimeout(60);
-}
+import { installHelpers, restart, aimAt, resolveLevelUps } from './helpers.mjs';
 
 export async function combatChecks({ page, check }) {
   await page.evaluate(installHelpers);
@@ -278,29 +214,47 @@ export async function combatChecks({ page, check }) {
     const s = window.T.S();
     s.player.health.invulnerable = true;
     for (const e of [...s.enemies.getChildren()]) s.combat.applyHit(s.player, e, { multiplier: 500, knockback: 100, hitstun: 0.2 }, { x: 1, y: 0 });
-    const died = window.T.count('entity:died');
-    const cleared = window.T.count('enemies:cleared');
-    await new Promise((r) => setTimeout(r, 3500));
-    return { died, cleared, remaining: s.enemies.getLength(), combatants: s.combat.combatants.size };
+    return { died: window.T.count('entity:died'), cleared: window.T.count('enemies:cleared') };
   });
+  await page.waitForTimeout(200);
+  await resolveLevelUps(page); // 9 kills grant enough EXP to level up (gameplay pauses)
+  await page.waitForTimeout(3500);
+  Object.assign(clear, await page.evaluate(() => ({ remaining: window.T.S().enemies.getLength(), combatants: window.T.S().combat.combatants.size })));
   check('Killing every enemy fires ENEMIES_CLEARED once', clear.died === 9 && clear.cleared === 1);
   check('Dead enemies are cleaned up (objects destroyed)', clear.remaining === 0 && clear.combatants === 1, `${clear.remaining} left, ${clear.combatants} combatants`);
 
   await restart(page);
   await page.evaluate(() => {
-    const s = window.T.S();
-    const [e] = window.T.keep('ghoul');
-    e.think = () => {};
+    const T = window.T;
+    const s = T.S();
+    const [e] = T.keep('ghoul');
+    T.place(e, s.player.x + 20, s.player.y);
     s.player.health.current = 1;
     s.combat.applyHit(e, s.player, { multiplier: 1, knockback: 50, hitstun: 0.2 }, { x: 1, y: 0 });
+    window.killer = e;
   });
-  await page.waitForTimeout(2200);
-  const dead = await page.evaluate(() => ({ state: window.T.S().player.fsm.name, died: window.T.count('player:died'), defeated: window.T.S().defeated }));
-  check('Player death: death animation then defeat screen', dead.state === 'dead' && dead.died === 1 && dead.defeated);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(800);
-  const revived = await page.evaluate(() => ({ hp: window.T.S().player.health.current, enemies: window.T.S().enemies.getLength(), defeated: window.T.S().defeated }));
-  check('Enter on defeat screen restarts the floor', revived.hp === 100 && revived.enemies === 9 && !revived.defeated);
+  await page.waitForTimeout(1600);
+  const finisher = await page.evaluate(() => ({
+    state: window.T.S().player.fsm.name,
+    died: window.T.count('player:died'),
+    killerStates: [...new Set(window.killer.fsm.history)],
+    pools: window.T.S().effects.bloodPools.length
+  }));
+  check('Player death: death animation, then the killer performs its finisher', finisher.state === 'dead' && finisher.died === 1 && finisher.killerStates.includes('finisher'),
+    finisher.killerStates.join(' > '));
+  check('Death sequence spills blood (particles + pool)', finisher.pools >= 1);
+  await page.waitForFunction(() => window.__ABYSS__.game.scene.isActive('GameOverScene'), null, { timeout: 9000 });
+  const go = await page.evaluate(() => ({ run: window.__ABYSS__.services.run, summary: window.__ABYSS__.game.scene.getScene('GameOverScene').summary }));
+  check('Game Over screen with run summary; run data discarded', go.run === null && go.summary.level >= 1 && go.summary.endedAt > 0);
+  await page.keyboard.press('Enter'); // "Rise Again"
+  await page.waitForFunction(() => window.__ABYSS__.game.scene.isActive('DungeonScene'), null, { timeout: 15000 });
+  await page.waitForTimeout(600);
+  const revived = await page.evaluate(() => {
+    const s = window.__ABYSS__.game.scene.getScene('DungeonScene');
+    const run = window.__ABYSS__.services.run;
+    return { hp: s.player.health.current, enemies: s.enemies.getLength(), level: run.level, buffs: Object.keys(run.buffs).length, stamina: run.stamina.current };
+  });
+  check('"Rise Again" starts a fresh run (level 1, no buffs, full HP/stamina)', revived.hp === 100 && revived.enemies === 9 && revived.level === 1 && revived.buffs === 0 && revived.stamina === 100);
 
   // ------------------------------------------------------------ stress
   const perf = await page.evaluate(async () => {

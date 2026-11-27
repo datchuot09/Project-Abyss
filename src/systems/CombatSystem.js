@@ -40,7 +40,7 @@ export class CombatSystem {
    * @param {object} spec  { radius, arc (deg), offset, multiplier, type, element, knockback, hitstun, duration }
    * @param {{x:number,y:number}} dir unit vector the attack faces
    */
-  spawnHitbox(owner, spec, dir, { follow = true } = {}) {
+  spawnHitbox(owner, spec, dir, { follow = true, x = null, y = null } = {}) {
     const hb = this.pool.pop() ?? { hit: new Set() };
     hb.owner = owner;
     hb.spec = spec;
@@ -49,9 +49,16 @@ export class CombatSystem {
     hb.follow = follow;
     hb.time = spec.duration ?? 0.1;
     hb.hit.clear();
-    const c = owner.body.center;
-    hb.x = c.x + dir.x * (spec.offset ?? 0);
-    hb.y = c.y + dir.y * (spec.offset ?? 0);
+    // AOE placed at a world point (x, y) never follows its owner.
+    if (x !== null && y !== null) {
+      hb.follow = false;
+      hb.x = x;
+      hb.y = y;
+    } else {
+      const c = owner.body.center;
+      hb.x = c.x + dir.x * (spec.offset ?? 0);
+      hb.y = c.y + dir.y * (spec.offset ?? 0);
+    }
     hb.active = true;
     this.hitboxes.push(hb);
     this.resolve(hb); // first-frame test so very short hitboxes always register
@@ -81,7 +88,7 @@ export class CombatSystem {
     for (let i = this.hitboxes.length - 1; i >= 0; i--) {
       const hb = this.hitboxes[i];
       hb.time -= dt;
-      if (hb.time <= 0 || !hb.owner.active || hb.owner.isDead) {
+      if (hb.time <= 0 || !hb.owner.active || (hb.follow && hb.owner.isDead)) {
         hb.active = false;
         this.hitboxes.splice(i, 1);
         this.pool.push(hb);
@@ -115,7 +122,9 @@ export class CombatSystem {
         if (!overlapsOrigin && Math.abs(Phaser.Math.Angle.Wrap(ang - facing)) > halfArc) continue;
       }
       hb.hit.add(target);
-      this.applyHit(hb.owner, target, hb.spec, { x: hb.dirX, y: hb.dirY }, 'melee');
+      // 360-degree hitboxes (AOE, body slams) knock targets away from their centre
+      const spec = arc >= 360 ? { ...hb.spec, radial: { x: hb.x, y: hb.y } } : hb.spec;
+      this.applyHit(hb.owner, target, spec, { x: hb.dirX, y: hb.dirY }, hb.spec.source ?? 'melee');
     }
   }
 
@@ -135,11 +144,14 @@ export class CombatSystem {
     });
     let kx = dir.x;
     let ky = dir.y;
-    if (source === 'projectile' || (kx === 0 && ky === 0)) {
-      const len = Math.hypot(kx, ky) || 1;
-      kx /= len;
-      ky /= len;
+    if (spec.radial) {
+      // AOE knockback pushes away from the blast centre
+      kx = target.body.center.x - spec.radial.x;
+      ky = target.body.center.y - spec.radial.y;
     }
+    const klen = Math.hypot(kx, ky) || 1;
+    kx /= klen;
+    ky /= klen;
     const hit = {
       attacker,
       source,
@@ -149,6 +161,11 @@ export class CombatSystem {
       hitstun: spec.hitstun ?? 0
     };
     const applied = target.receiveHit(hit);
+    if (applied > 0 && spec.status && target.isTargetable()) {
+      for (const st of spec.status) {
+        if (Math.random() < (st.chance ?? 1)) target.applyStatus(st.id, { duration: st.duration, potency: st.potency ?? 0, source: attacker });
+      }
+    }
     if (applied > 0) {
       EventBus.emit(Events.COMBAT_HIT, {
         target, attacker, damage: applied, crit: dmg.crit, type: dmg.type, element: dmg.element,
@@ -156,6 +173,20 @@ export class CombatSystem {
       });
     }
     return hit;
+  }
+
+  /** Damage-over-time tick: no knockback, no stagger, ignores i-frames. */
+  applyDot(target, tick) {
+    if (!target.isTargetable()) return 0;
+    const amount = Math.max(1, Math.round(tick.amount));
+    const applied = target.receiveHit({ attacker: tick.source, source: 'dot', team: tick.source?.team, amount, crit: false, type: 'dot', element: tick.element, knockback: { x: 0, y: 0 }, hitstun: 0, dot: true });
+    if (applied > 0) {
+      EventBus.emit(Events.COMBAT_HIT, {
+        target, attacker: tick.source, damage: applied, crit: false, type: 'dot', element: tick.element,
+        x: target.body.center.x, y: target.body.top, team: target.team, source: 'dot', statusId: tick.id
+      });
+    }
+    return applied;
   }
 
   destroy() {

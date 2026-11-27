@@ -2,6 +2,7 @@ import { EventBus } from '../core/EventBus.js';
 import { Events } from '../core/Events.js';
 import { approachFactor } from '../core/math.js';
 import { StateMachine } from '../systems/StateMachine.js';
+import { computeStats } from '../systems/StatCalculator.js';
 import { Combatant } from './Combatant.js';
 
 const DIR_VECTORS = { down: { x: 0, y: 1 }, up: { x: 0, y: -1 } };
@@ -30,6 +31,9 @@ export class Player extends Combatant {
     this.castCooldown = 0;
     this.controls = null;
 
+    this.baseStats = { ...character.stats };
+    this.skills = character.skills ?? {};
+    this.skillCooldowns = { skill1: 0, skill2: 0, ultimate: 0 };
     this.health.onChange((e) => EventBus.emit(Events.PLAYER_HP_CHANGED, e));
 
     this.fsm = new StateMachine(this, {
@@ -38,13 +42,59 @@ export class Player extends Combatant {
       cast: { enter: this.enterCast, update: this.updateCast },
       dodge: { enter: this.enterDodge, update: this.updateDodge, exit: () => this.setAlpha(1) },
       hit: { enter: this.enterHit, update: this.updateHit },
-      dead: { enter: this.enterDead }
+      dead: { enter: this.enterDead },
+      disabled: { enter: this.enterDisabled, update: this.updateDisabled },
+      rush: { enter: this.enterRush, update: this.updateRush, exit: () => this.setAlpha(1) },
+      sigil: { enter: this.enterSigil, update: this.updateSigil },
+      eclipse: { enter: this.enterEclipse, update: this.updateEclipse, exit: () => (this.superArmor = false) }
     }, 'move');
     this.playAnim('idle');
   }
 
   get moveSpeed() {
-    return this.stats.movementSpeed;
+    return this.stats.movementSpeed * this.status.speedMultiplier;
+  }
+
+  // -------------------------------------------------------------- stats
+  /**
+   * Recompute final stats from base + run buffs + stamina penalties.
+   * Max HP changes keep current HP consistent (gains heal the difference).
+   */
+  recomputeStats(run, buffData) {
+    const prevMax = this.health.max;
+    this.stats = computeStats(this.baseStats, {
+      buffs: run?.buffs ?? {},
+      buffDefs: buffData?.buffs ?? {},
+      caps: buffData?.caps ?? {},
+      stamina: run ? run.stamina.effects : null
+    });
+    if (this.stats.maxHp !== prevMax) {
+      const diff = this.stats.maxHp - prevMax;
+      this.health.setMax(this.stats.maxHp, { keepRatio: false });
+      if (diff > 0) this.health.heal(diff);
+    }
+    EventBus.emit(Events.PLAYER_STATS_CHANGED, { stats: this.stats });
+  }
+
+  /** All healing passes through here so healing modifiers apply. */
+  heal(amount, source = null) {
+    return this.health.heal(amount * (this.stats.healingMultiplier ?? 1), source);
+  }
+
+  cooldownOf(seconds) {
+    return seconds * (1 - Math.min(0.4, this.stats.cooldownReduction ?? 0));
+  }
+
+  /** Read-only view for the HUD skill bar. */
+  getSkillHud() {
+    const c = this.cfg;
+    return [
+      { slot: 'secondary', action: 'secondary', icon: c.secondary.icon, remaining: this.castCooldown, total: this.cooldownOf(c.secondary.cooldown) },
+      { slot: 'dodge', action: 'dodge', icon: c.dodge.icon, remaining: this.dodgeCooldown, total: c.dodge.cooldown + c.dodge.duration },
+      ...['skill1', 'skill2', 'ultimate'].filter((k) => this.skills[k]).map((k) => ({
+        slot: k, action: k, icon: this.skills[k].icon, remaining: this.skillCooldowns[k], total: this.cooldownOf(this.skills[k].cooldown)
+      }))
+    ];
   }
 
   get attackSpeed() {
@@ -61,6 +111,12 @@ export class Player extends Combatant {
     // must not swallow inputs); elsewhere it expires after inputBuffer.
     if (!this.fsm.is('attack')) this.attackBuffer = Math.max(0, this.attackBuffer - dt);
     this.comboTimer = Math.max(0, this.comboTimer - dt);
+    for (const k of Object.keys(this.skillCooldowns)) this.skillCooldowns[k] = Math.max(0, this.skillCooldowns[k] - dt);
+    if (!this.health.isDead) {
+      this.updateStatus(dt);
+      if (this.health.isDead) return;
+      if (!this.status.canAct && !this.fsm.is('disabled', 'dead')) this.fsm.set('disabled');
+    }
     if (this.comboTimer === 0 && !this.fsm.is('attack')) this.comboIndex = 0;
     if (input.justPressed('attack')) this.attackBuffer = this.cfg.primary.inputBuffer;
 
@@ -122,6 +178,9 @@ export class Player extends Combatant {
     if (this.wantsDodge()) return this.fsm.set('dodge');
     if (this.attackBuffer > 0) return this.fsm.set('attack');
     if (input.justPressed('secondary') && this.castCooldown <= 0) return this.fsm.set('cast');
+    if (input.justPressed('skill1') && this.skillReady('skill1')) return this.fsm.set('rush');
+    if (input.justPressed('skill2') && this.skillReady('skill2')) return this.fsm.set('sigil');
+    if (input.justPressed('ultimate') && this.skillReady('ultimate')) return this.fsm.set('eclipse');
 
     const move = input.getMoveVector();
     const moving = move.x !== 0 || move.y !== 0;
@@ -185,7 +244,7 @@ export class Player extends Combatant {
 
   enterCast() {
     const c = this.cfg.secondary;
-    this.castCooldown = c.cooldown;
+    this.castCooldown = this.cooldownOf(c.cooldown);
     this.castDir = { ...this.aim };
     this.released = false;
     this.faceVector(this.castDir.x, this.castDir.y);
@@ -244,6 +303,9 @@ export class Player extends Combatant {
   }
 
   enterDead(hit) {
+    this.status.clear();
+    this.refreshStatusVisual();
+    this.killer = hit?.attacker ?? null;
     this.body.setVelocity(hit ? hit.knockback.x * 0.5 : 0, hit ? hit.knockback.y * 0.5 : 0);
     this.body.setDrag(400, 400);
     this.ctx.combat.cancelHitboxesOf(this);
@@ -252,11 +314,130 @@ export class Player extends Combatant {
     this.once('animationcomplete', () => EventBus.emit(Events.PLAYER_DIED, { player: this, killer: hit?.attacker }));
   }
 
+  // ------------------------------------------------------------------ skills
+  skillReady(key) {
+    return Boolean(this.skills[key]) && this.skillCooldowns[key] <= 0;
+  }
+
+  startCooldown(key) {
+    this.skillCooldowns[key] = this.cooldownOf(this.skills[key].cooldown);
+  }
+
+  skillSpec(hitbox) {
+    return { ...hitbox, multiplier: hitbox.multiplier * (this.stats.skillDamage ?? 1), source: 'skill' };
+  }
+
+  /** Q – Rune Rush: dash through enemies with a body hitbox and i-frames. */
+  enterRush() {
+    const sk = this.skills.skill1;
+    this.startCooldown('skill1');
+    this.rushDir = { ...this.aim };
+    this.faceVector(this.rushDir.x, this.rushDir.y);
+    this.iframeTime = Math.max(this.iframeTime, sk.iframes);
+    this.comboIndex = 0;
+    this.attackBuffer = 0;
+    this.body.setVelocity(this.rushDir.x * sk.distanceSpeed, this.rushDir.y * sk.distanceSpeed);
+    this.ctx.combat.spawnHitbox(this, { ...this.skillSpec(sk.hitbox), duration: sk.duration }, this.rushDir);
+    this.playTimed('attack', sk.duration);
+    this.afterimageTimer = 0;
+  }
+
+  updateRush(dt) {
+    const sk = this.skills.skill1;
+    this.afterimageTimer -= dt;
+    if (this.afterimageTimer <= 0) {
+      this.afterimageTimer = 0.035;
+      this.ctx.effects.afterimage(this, 0x8fd8ff);
+    }
+    if (this.fsm.elapsed >= sk.duration) {
+      this.approachVelocity(0, 0, 30, dt);
+      this.fsm.set('move');
+    }
+  }
+
+  /** E – Frost Sigil: a rune at the aim point detonates after a short delay. */
+  enterSigil() {
+    const sk = this.skills.skill2;
+    this.startCooldown('skill2');
+    const c = this.body.center;
+    let dist = sk.range * 0.6;
+    if (this.controls.aimDevice === 'mouse') {
+      const p = this.controls.getAimWorldPoint();
+      dist = Math.min(sk.range, Math.hypot(p.x - c.x, p.y - c.y));
+    }
+    // walk the point back toward the player until it is on visible, open ground
+    const nav = this.ctx.nav;
+    let tx = c.x + this.aim.x * dist;
+    let ty = c.y + this.aim.y * dist;
+    for (let d = dist; d > 0 && (!nav.isWalkable(tx, ty) || !nav.hasLineOfSight(c.x, c.y, tx, ty)); d -= 4) {
+      tx = c.x + this.aim.x * d;
+      ty = c.y + this.aim.y * d;
+    }
+    this.sigilPoint = { x: tx, y: ty };
+    this.faceVector(this.aim.x, this.aim.y);
+    this.playTimed('cast', sk.castTime);
+    const spec = this.skillSpec(sk.hitbox);
+    this.ctx.effects.sigil(tx, ty, sk.hitbox.radius, sk.delay, () => {
+      if (!this.scene) return;
+      this.ctx.combat.spawnHitbox(this, { ...spec, duration: 0.08 }, { x: 0, y: 0 }, { x: tx, y: ty });
+      this.ctx.effects.blast(tx, ty, sk.hitbox.radius, 0x9fe8ff);
+    });
+  }
+
+  updateSigil(dt) {
+    this.approachVelocity(0, 0, 12, dt);
+    if (this.fsm.elapsed >= this.skills.skill2.castTime) this.fsm.set('move');
+  }
+
+  /** R – Abyssal Eclipse (Ultimate): channel, then a huge shadow burst with Stun. */
+  enterEclipse() {
+    const sk = this.skills.ultimate;
+    this.startCooldown('ultimate');
+    this.superArmor = true;
+    this.iframeTime = Math.max(this.iframeTime, sk.iframes);
+    this.released = false;
+    this.playTimed('cast', sk.channel);
+    this.ctx.effects.eclipseCharge(this, sk.hitbox.radius, sk.channel);
+  }
+
+  updateEclipse(dt) {
+    const sk = this.skills.ultimate;
+    this.approachVelocity(0, 0, 14, dt);
+    if (!this.released && this.fsm.elapsed >= sk.channel) {
+      this.released = true;
+      const c = this.body.center;
+      this.ctx.combat.spawnHitbox(this, { ...this.skillSpec(sk.hitbox), duration: 0.1 }, { x: 0, y: 0 }, { x: c.x, y: c.y });
+      this.ctx.effects.blast(c.x, c.y, sk.hitbox.radius, 0x9a5cff, true);
+    }
+    if (this.fsm.elapsed >= sk.channel + 0.15) this.fsm.set('move');
+  }
+
+  enterDisabled() {
+    this.ctx.combat.cancelHitboxesOf(this);
+    this.attackBuffer = 0;
+    this.playAnim('hit', { restart: true });
+  }
+
+  updateDisabled(dt) {
+    this.approachVelocity(0, 0, 20, dt);
+    if (this.status.canAct) this.fsm.set('move');
+  }
+
   // ------------------------------------------------------------------ combat
   receiveHit(hit) {
-    if (this.health.isDead || this.isInvulnerable()) return 0;
+    if (this.health.isDead) return 0;
+    if (hit.dot) {
+      const dot = this.health.damage(hit.amount, hit.attacker);
+      if (this.health.isDead) this.fsm.set('dead', hit);
+      return dot;
+    }
+    if (this.isInvulnerable()) return 0;
     const applied = this.health.damage(hit.amount, hit.attacker);
     if (applied <= 0) return 0;
+    if (this.superArmor && !this.health.isDead) {
+      this.iframeTime = Math.max(this.iframeTime, 0.3);
+      return applied;
+    }
     if (this.health.isDead) {
       this.fsm.set('dead', hit);
     } else {

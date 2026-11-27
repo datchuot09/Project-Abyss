@@ -113,5 +113,9 @@
     "every": 3,
     "arrows": 3,
     "spreadDeg": 16
+  },
+  "exp": 10,
+  "finisher": {
+    "type": "execute_shot"
   }
 }
