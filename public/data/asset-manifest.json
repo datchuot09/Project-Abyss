@@ -2,21 +2,194 @@
   "version": 1,
   "groups": {
     "core": [
-      { "type": "bitmapFont", "key": "abyss_font", "textureURL": "assets/fonts/abyss_font.png", "fontDataURL": "assets/fonts/abyss_font.xml" },
-      { "type": "image", "key": "dungeon_tiles", "url": "assets/tilesets/dungeon_tiles.png" },
-      { "type": "spritesheet", "key": "player_wanderer", "url": "assets/characters/wanderer.png", "frameConfig": { "frameWidth": 24, "frameHeight": 24 } },
-      { "type": "spritesheet", "key": "torch", "url": "assets/effects/torch.png", "frameConfig": { "frameWidth": 16, "frameHeight": 16 } },
-      { "type": "image", "key": "light_glow", "url": "assets/effects/light_glow.png" },
-      { "type": "image", "key": "px_white", "url": "assets/effects/px_white.png" },
-      { "type": "image", "key": "px_ember", "url": "assets/effects/ember.png" },
-      { "type": "json", "key": "character_wanderer", "url": "data/characters/wanderer.json" }
+      {
+        "type": "bitmapFont",
+        "key": "abyss_font",
+        "textureURL": "assets/fonts/abyss_font.png",
+        "fontDataURL": "assets/fonts/abyss_font.xml"
+      },
+      {
+        "type": "image",
+        "key": "dungeon_tiles",
+        "url": "assets/tilesets/dungeon_tiles.png"
+      },
+      {
+        "type": "spritesheet",
+        "key": "player_wanderer",
+        "url": "assets/characters/wanderer.png",
+        "frameConfig": {
+          "frameWidth": 24,
+          "frameHeight": 24
+        }
+      },
+      {
+        "type": "spritesheet",
+        "key": "torch",
+        "url": "assets/effects/torch.png",
+        "frameConfig": {
+          "frameWidth": 16,
+          "frameHeight": 16
+        }
+      },
+      {
+        "type": "image",
+        "key": "light_glow",
+        "url": "assets/effects/light_glow.png"
+      },
+      {
+        "type": "image",
+        "key": "px_white",
+        "url": "assets/effects/px_white.png"
+      },
+      {
+        "type": "image",
+        "key": "px_ember",
+        "url": "assets/effects/ember.png"
+      },
+      {
+        "type": "json",
+        "key": "character_wanderer",
+        "url": "data/characters/wanderer.json"
+      },
+      {
+        "type": "spritesheet",
+        "key": "monster_ghoul",
+        "url": "assets/monsters/ghoul.png",
+        "frameConfig": {
+          "frameWidth": 24,
+          "frameHeight": 24
+        }
+      },
+      {
+        "type": "spritesheet",
+        "key": "monster_bone_archer",
+        "url": "assets/monsters/bone_archer.png",
+        "frameConfig": {
+          "frameWidth": 24,
+          "frameHeight": 24
+        }
+      },
+      {
+        "type": "spritesheet",
+        "key": "monster_abyss_mite",
+        "url": "assets/monsters/abyss_mite.png",
+        "frameConfig": {
+          "frameWidth": 16,
+          "frameHeight": 16
+        }
+      },
+      {
+        "type": "spritesheet",
+        "key": "slash",
+        "url": "assets/effects/slash.png",
+        "frameConfig": {
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      },
+      {
+        "type": "spritesheet",
+        "key": "arcane_bolt",
+        "url": "assets/effects/arcane_bolt.png",
+        "frameConfig": {
+          "frameWidth": 10,
+          "frameHeight": 10
+        }
+      },
+      {
+        "type": "image",
+        "key": "arrow",
+        "url": "assets/effects/arrow.png"
+      },
+      {
+        "type": "spritesheet",
+        "key": "hit_spark",
+        "url": "assets/effects/hit_spark.png",
+        "frameConfig": {
+          "frameWidth": 16,
+          "frameHeight": 16
+        }
+      },
+      {
+        "type": "image",
+        "key": "shadow",
+        "url": "assets/effects/shadow.png"
+      },
+      {
+        "type": "image",
+        "key": "crosshair",
+        "url": "assets/ui/crosshair.png"
+      },
+      {
+        "type": "json",
+        "key": "projectiles",
+        "url": "data/skills/projectiles.json"
+      },
+      {
+        "type": "json",
+        "key": "monster_ghoul_data",
+        "url": "data/monsters/ghoul.json"
+      },
+      {
+        "type": "json",
+        "key": "monster_bone_archer_data",
+        "url": "data/monsters/bone_archer.json"
+      },
+      {
+        "type": "json",
+        "key": "monster_abyss_mite_data",
+        "url": "data/monsters/abyss_mite.json"
+      }
     ]
   },
   "characters": {
     "wanderer": "character_wanderer"
   },
   "animations": {
-    "torch_burn": { "texture": "torch", "frames": [0, 1, 2, 3], "frameRate": 8, "repeat": -1 }
+    "torch_burn": {
+      "texture": "torch",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    "slash_swing": {
+      "texture": "slash",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frameRate": 24,
+      "repeat": 0
+    },
+    "hit_spark_burst": {
+      "texture": "hit_spark",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frameRate": 24,
+      "repeat": 0
+    },
+    "arcane_bolt_spin": {
+      "texture": "arcane_bolt",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frameRate": 14,
+      "repeat": -1
+    }
   },
   "floors": {
     "test_chamber": {
@@ -24,8 +197,17 @@
       "description": "Cold stone and colder silence. Something below is listening.",
       "mapKey": "map_test_chamber",
       "assets": [
-        { "type": "tilemapTiledJSON", "key": "map_test_chamber", "url": "data/dungeons/test_chamber.json" }
+        {
+          "type": "tilemapTiledJSON",
+          "key": "map_test_chamber",
+          "url": "data/dungeons/test_chamber.json"
+        }
       ]
     }
+  },
+  "monsters": {
+    "ghoul": "monster_ghoul_data",
+    "bone_archer": "monster_bone_archer_data",
+    "abyss_mite": "monster_abyss_mite_data"
   }
 }

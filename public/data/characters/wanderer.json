@@ -1,21 +1,25 @@
 {
   "id": "wanderer",
   "name": "The Wanderer",
-  "description": "A hooded exile who descends with nothing but a lantern-lit gaze.",
+  "description": "A hooded exile who descends with a rune-etched blade and a sliver of arcane fire.",
   "stats": {
     "maxHp": 100,
     "physicalDamage": 10,
-    "magicDamage": 6,
+    "magicDamage": 9,
     "defense": 4,
     "movementSpeed": 92,
     "attackSpeed": 1.0,
     "critRate": 0.05,
     "skillCooldown": 1.0,
-    "stamina": 100
+    "stamina": 100,
+    "critMultiplier": 1.5,
+    "knockbackResist": 0
   },
   "movement": {
     "acceleration": 16,
-    "deceleration": 20
+    "deceleration": 20,
+    "runAfter": 0.45,
+    "runSpeedMultiplier": 1.3
   },
   "sprite": {
     "texture": "player_wanderer",
@@ -32,11 +36,197 @@
     "offsetY": 16
   },
   "animations": {
-    "idle": { "frameRate": 4, "repeat": -1, "rows": { "down": 0, "side": 1, "up": 2 }, "frames": [0, 1, 2, 3] },
-    "walk": { "frameRate": 10, "repeat": -1, "rows": { "down": 0, "side": 1, "up": 2 }, "frames": [4, 5, 6, 7] }
+    "idle": {
+      "frameRate": 4,
+      "repeat": -1,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "walk": {
+      "frameRate": 10,
+      "repeat": -1,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "run": {
+      "frameRate": 13,
+      "repeat": -1,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "attack": {
+      "frameRate": 14,
+      "repeat": 0,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    "cast": {
+      "frameRate": 10,
+      "repeat": 0,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        16,
+        17
+      ]
+    },
+    "dodge": {
+      "frameRate": 16,
+      "repeat": 0,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        18,
+        19,
+        20,
+        21
+      ]
+    },
+    "hit": {
+      "frameRate": 8,
+      "repeat": 0,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        22
+      ]
+    },
+    "death": {
+      "frameRate": 6,
+      "repeat": 0,
+      "rows": {
+        "down": 0,
+        "side": 1,
+        "up": 2
+      },
+      "frames": [
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    }
   },
-  "animationStatus": {
-    "implemented": ["idle", "walk"],
-    "plannedPhase2": ["run", "attack", "skill", "dodge", "hit", "death"]
+  "shadow": {
+    "width": 14,
+    "offsetY": 0
+  },
+  "combat": {
+    "primary": {
+      "comboWindow": 0.32,
+      "inputBuffer": 0.2,
+      "steps": [
+        {
+          "duration": 0.3,
+          "activeFrom": 0.06,
+          "activeTo": 0.16,
+          "multiplier": 1.0,
+          "type": "physical",
+          "radius": 26,
+          "arc": 130,
+          "knockback": 110,
+          "hitstun": 0.22,
+          "lunge": 55,
+          "slashScale": 1,
+          "slashFlipY": false,
+          "shake": 0
+        },
+        {
+          "duration": 0.3,
+          "activeFrom": 0.06,
+          "activeTo": 0.16,
+          "multiplier": 1.0,
+          "type": "physical",
+          "radius": 26,
+          "arc": 130,
+          "knockback": 110,
+          "hitstun": 0.22,
+          "lunge": 55,
+          "slashScale": 1,
+          "slashFlipY": true,
+          "shake": 0
+        },
+        {
+          "duration": 0.44,
+          "activeFrom": 0.12,
+          "activeTo": 0.24,
+          "multiplier": 1.7,
+          "type": "physical",
+          "radius": 30,
+          "arc": 170,
+          "knockback": 230,
+          "hitstun": 0.38,
+          "lunge": 85,
+          "slashScale": 1.3,
+          "slashFlipY": false,
+          "shake": 0.004
+        }
+      ]
+    },
+    "secondary": {
+      "projectile": "arcane_bolt",
+      "castTime": 0.24,
+      "releaseAt": 0.1,
+      "cooldown": 0.7,
+      "multiplier": 1.3,
+      "type": "magic",
+      "element": "arcane"
+    },
+    "dodge": {
+      "speed": 235,
+      "duration": 0.26,
+      "iframes": 0.24,
+      "cooldown": 0.5
+    },
+    "hurt": {
+      "hitstun": 0.2,
+      "iframes": 0.75
+    }
   }
 }

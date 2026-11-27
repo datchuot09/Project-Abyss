@@ -34,6 +34,9 @@ export class PreloadScene extends Phaser.Scene {
     for (const id of Object.keys(manifest.characters ?? {})) {
       AssetManager.createCharacterAnimations(this, AssetManager.getCharacter(this, id));
     }
+    for (const id of Object.keys(manifest.monsters ?? {})) {
+      AssetManager.createCharacterAnimations(this, AssetManager.getMonster(this, id));
+    }
     AssetManager.createSharedAnimations(this);
     this.scene.start(SceneKeys.MAIN_MENU);
   }

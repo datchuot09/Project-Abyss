@@ -1,0 +1,118 @@
+{
+  "id": "abyss_mite",
+  "name": "Abyss Mite",
+  "ai": "skitter",
+  "description": "A chittering parasite of the deep. Never alone.",
+  "stats": {
+    "maxHp": 16,
+    "physicalDamage": 6,
+    "magicDamage": 0,
+    "defense": 0,
+    "movementSpeed": 74,
+    "critRate": 0.05,
+    "critMultiplier": 1.5,
+    "knockbackResist": 0
+  },
+  "sprite": {
+    "texture": "monster_abyss_mite",
+    "frameWidth": 16,
+    "frameHeight": 16,
+    "columns": 18,
+    "originX": 0.5,
+    "originY": 0.8125
+  },
+  "body": {
+    "width": 8,
+    "height": 5,
+    "offsetX": 4,
+    "offsetY": 9
+  },
+  "shadow": {
+    "width": 12
+  },
+  "hpBar": {
+    "width": 10,
+    "offsetY": 14
+  },
+  "bloodColor": "#55246e",
+  "animations": {
+    "idle": {
+      "frameRate": 8,
+      "repeat": -1,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "walk": {
+      "frameRate": 14,
+      "repeat": -1,
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "attack": {
+      "frameRate": 14,
+      "repeat": 0,
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "hit": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        12
+      ]
+    },
+    "death": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        13,
+        14,
+        15,
+        16,
+        17
+      ]
+    }
+  },
+  "perception": {
+    "detectRange": 100,
+    "loseRange": 180,
+    "reactionTime": 0.2,
+    "hearingRange": 40
+  },
+  "patrol": {
+    "radius": 28,
+    "speedMultiplier": 0.6,
+    "idleMin": 0.4,
+    "idleMax": 1.2
+  },
+  "attack": {
+    "orbitRadius": 42,
+    "triggerRange": 72,
+    "windup": 0.32,
+    "dashSpeed": 215,
+    "dashTime": 0.24,
+    "recover": 0.6,
+    "cooldown": 1.0,
+    "hitbox": {
+      "radius": 8,
+      "arc": 360,
+      "offset": 0,
+      "multiplier": 1.0,
+      "type": "physical",
+      "knockback": 110,
+      "hitstun": 0.15
+    }
+  }
+}

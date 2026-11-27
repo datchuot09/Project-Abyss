@@ -1,0 +1,124 @@
+{
+  "id": "ghoul",
+  "name": "Ghoul",
+  "ai": "brute",
+  "description": "A starving corpse that lunges with filthy claws.",
+  "stats": {
+    "maxHp": 46,
+    "physicalDamage": 9,
+    "magicDamage": 0,
+    "defense": 3,
+    "movementSpeed": 56,
+    "critRate": 0.03,
+    "critMultiplier": 1.5,
+    "knockbackResist": 0.25
+  },
+  "sprite": {
+    "texture": "monster_ghoul",
+    "frameWidth": 24,
+    "frameHeight": 24,
+    "columns": 18,
+    "originX": 0.5,
+    "originY": 0.9167
+  },
+  "body": {
+    "width": 12,
+    "height": 7,
+    "offsetX": 6,
+    "offsetY": 15
+  },
+  "shadow": {
+    "width": 16
+  },
+  "hpBar": {
+    "width": 16,
+    "offsetY": 24
+  },
+  "bloodColor": "#5a0f16",
+  "animations": {
+    "idle": {
+      "frameRate": 5,
+      "repeat": -1,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "walk": {
+      "frameRate": 8,
+      "repeat": -1,
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "attack": {
+      "frameRate": 10,
+      "repeat": 0,
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "hit": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        12
+      ]
+    },
+    "death": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        13,
+        14,
+        15,
+        16,
+        17
+      ]
+    }
+  },
+  "perception": {
+    "detectRange": 115,
+    "loseRange": 200,
+    "reactionTime": 0.35,
+    "hearingRange": 36
+  },
+  "patrol": {
+    "radius": 40,
+    "speedMultiplier": 0.5,
+    "idleMin": 0.8,
+    "idleMax": 2.2
+  },
+  "attack": {
+    "range": 24,
+    "windup": 0.45,
+    "lungeSpeed": 175,
+    "lungeTime": 0.2,
+    "recover": 0.55,
+    "cooldown": 1.1,
+    "hitbox": {
+      "radius": 16,
+      "arc": 120,
+      "offset": 6,
+      "multiplier": 1.0,
+      "type": "physical",
+      "knockback": 160,
+      "hitstun": 0.2
+    }
+  },
+  "skill": {
+    "id": "frenzy",
+    "hpThreshold": 0.4,
+    "roarTime": 0.6,
+    "speedMultiplier": 1.35,
+    "cooldownMultiplier": 0.7
+  }
+}

@@ -6,6 +6,7 @@ import { Events } from './core/Events.js';
 import { SettingsManager } from './managers/SettingsManager.js';
 import { DisplayManager } from './managers/DisplayManager.js';
 import { SCENES } from './scenes/index.js';
+import { createEnemy } from './entities/EnemyFactory.js';
 
 services.settings = new SettingsManager(undefined, (path, value) => EventBus.emit(Events.SETTINGS_CHANGED, path, value));
 
@@ -48,5 +49,5 @@ game.events.once(Phaser.Core.Events.READY, () => services.display.init());
 
 // Debug/test handle: available in dev builds, or in production with ?debug.
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
-  window.__ABYSS__ = { game, services, EventBus };
+  window.__ABYSS__ = { game, services, EventBus, debugFactory: { createEnemy } };
 }

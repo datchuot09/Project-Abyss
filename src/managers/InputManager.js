@@ -39,11 +39,34 @@ export class InputManager extends Phaser.Events.EventEmitter {
     this.moveVector = { x: 0, y: 0 };
     this.virtualMove = null; // Phase 12: virtual joystick writes here
     this.virtualActions = new Set();
+    // Presses latched from events between two update() calls, so a tap that
+    // is pressed AND released within one frame is never lost.
+    this.pendingPresses = new Set();
     this.lastDevice = 'keyboard';
     this.enabled = true;
 
     scene.input.mouse?.disableContextMenu();
     this.buildKeys();
+
+    // Mouse aiming becomes active as soon as the mouse moves or clicks.
+    this._onPointer = (pointer) => {
+      if (pointer.wasTouch) this.setDevice('touch');
+      else this.setDevice('mouse');
+    };
+    this._onPointerDown = (pointer) => {
+      this._onPointer(pointer);
+      if (!this.enabled || pointer.wasTouch) return;
+      const name = ['MOUSE_LEFT', 'MOUSE_MIDDLE', 'MOUSE_RIGHT'][pointer.button];
+      const bindings = this.getKeyBindings();
+      for (const action of ACTIONS) {
+        if ((bindings[action] ?? []).includes(name)) {
+          this.pendingPresses.add(action);
+          this.emit('pressed', action);
+        }
+      }
+    };
+    scene.input.on('pointermove', this._onPointer);
+    scene.input.on('pointerdown', this._onPointerDown);
 
     if (globalHotkeys) {
       this.on('pressed', (action) => {
@@ -96,6 +119,7 @@ export class InputManager extends Phaser.Events.EventEmitter {
           }
           if (!this.enabled) return;
           this.setDevice('keyboard');
+          this.pendingPresses.add(action);
           this.emit('pressed', action);
         };
         key.on('down', onDown);
@@ -171,17 +195,19 @@ export class InputManager extends Phaser.Events.EventEmitter {
       if (pad) for (const idx of padBindings[action] ?? []) if (pad.buttons[idx]?.pressed) padDown = true;
 
       const down = this.enabled && (keyDown || mouseDown || padDown || this.virtualActions.has(action));
-      s.pressed = down && !wasDown;
-      s.released = !down && wasDown;
+      const latched = this.enabled && this.pendingPresses.has(action);
+      s.pressed = (down && !wasDown) || latched;
+      s.released = (!down && wasDown) || (latched && !down);
       s.down = down;
 
-      if (s.pressed) {
+      // Keyboard and mouse presses were already emitted from their event
+      // handlers; only polled sources (gamepad, virtual) emit here.
+      if (s.pressed && !latched && (padDown || this.virtualActions.has(action))) {
         if (padDown) this.setDevice('gamepad');
-        else if (mouseDown) this.setDevice('mouse');
-        // Keyboard presses already emitted 'pressed' from the key handler.
-        if (!keyDown) this.emit('pressed', action);
+        this.emit('pressed', action);
       }
     }
+    this.pendingPresses.clear();
 
     // Movement: keyboard/d-pad digital axes, analog stick, or virtual joystick.
     let x = (this.isDown('moveRight') ? 1 : 0) - (this.isDown('moveLeft') ? 1 : 0);
@@ -217,10 +243,36 @@ export class InputManager extends Phaser.Events.EventEmitter {
     return this.moveVector;
   }
 
-  /** World-space aim point under the mouse (used from Phase 2 for attacks). */
+  /** World-space point under the mouse. */
   getAimWorldPoint(camera = this.scene.cameras.main) {
     const p = this.scene.input.activePointer;
     return camera.getWorldPoint(p.x, p.y);
+  }
+
+  /**
+   * Unit aim direction from a world-space origin, or null when the player
+   * has no explicit aim (keyboard-only): callers then use their facing.
+   *  - gamepad: right stick (falls back to null inside the deadzone)
+   *  - mouse:   toward the cursor
+   */
+  getAimVector(originX, originY, camera = this.scene.cameras.main) {
+    if (this.lastDevice === 'gamepad') {
+      const pad = this.getPad();
+      if (pad) {
+        const v = normalizeMove(pad.rightStick.x, pad.rightStick.y, STICK_DEADZONE);
+        const len = Math.hypot(v.x, v.y);
+        if (len > 0) return { x: v.x / len, y: v.y / len };
+      }
+      return null;
+    }
+    if (this.lastDevice === 'mouse') {
+      const p = this.getAimWorldPoint(camera);
+      const dx = p.x - originX;
+      const dy = p.y - originY;
+      const len = Math.hypot(dx, dy);
+      if (len > 0.5) return { x: dx / len, y: dy / len };
+    }
+    return null;
   }
 
   // ------------------------------------------------------ virtual (touch) API
@@ -242,11 +294,16 @@ export class InputManager extends Phaser.Events.EventEmitter {
 
   setEnabled(enabled) {
     this.enabled = enabled;
-    if (!enabled) for (const s of this.state.values()) Object.assign(s, { down: false, pressed: false, released: false });
+    if (!enabled) {
+      this.pendingPresses.clear();
+      for (const s of this.state.values()) Object.assign(s, { down: false, pressed: false, released: false });
+    }
   }
 
   destroy() {
     EventBus.off(Events.INPUT_BINDINGS_CHANGED, this._onBindingsChanged);
+    this.scene.input?.off('pointermove', this._onPointer);
+    this.scene.input?.off('pointerdown', this._onPointerDown);
     this.releaseKeys();
     this.removeAllListeners();
   }

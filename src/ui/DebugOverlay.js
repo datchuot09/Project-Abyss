@@ -12,8 +12,8 @@ export class DebugOverlay {
     this.player = player;
     this.map = map;
     this.input = input;
-    this.bg = scene.add.rectangle(2, 268, 150, 60, 0x000000, 0.55).setOrigin(0, 1).setScrollFactor(0).setDepth(DEPTH.DEBUG);
-    this.text = scene.add.bitmapText(5, 211, FONT_KEY, '', 11).setScrollFactor(0).setDepth(DEPTH.DEBUG).setTint(0x9dffb0);
+    this.bg = scene.add.rectangle(2, 268, 170, 82, 0x000000, 0.55).setOrigin(0, 1).setScrollFactor(0).setDepth(DEPTH.DEBUG);
+    this.text = scene.add.bitmapText(5, 189, FONT_KEY, '', 11).setScrollFactor(0).setDepth(DEPTH.DEBUG).setTint(0x9dffb0);
     this.visible = Boolean(services.settings?.get('video.showDebug'));
     this.apply();
   }
@@ -49,6 +49,8 @@ export class DebugOverlay {
       `Scale x${d ? +d.physicalScale.toFixed(2) : '?'} ${d?.mode ?? ''}${d?.integer ? '' : ' (frac)'}`,
       `Pos ${p.x},${p.y}  Tile ${t.tx},${t.ty}`,
       `Vel ${p.vx},${p.vy}  ${p.facing}`,
+      `State ${p.state}  HP ${p.hp}`,
+      `Enemies ${this.scene.aliveEnemies?.length ?? 0}  Proj ${this.scene.projectiles?.activeCount ?? 0}`,
       `Input ${this.input.lastDevice}`
     ]);
   }

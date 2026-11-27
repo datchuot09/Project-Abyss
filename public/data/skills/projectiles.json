@@ -1,0 +1,27 @@
+{
+  "arcane_bolt": {
+    "texture": "arcane_bolt",
+    "frameRate": 14,
+    "speed": 235,
+    "radius": 4,
+    "lifetime": 1.1,
+    "knockback": 90,
+    "hitstun": 0.18,
+    "rotate": false,
+    "trailColor": "#b99cff",
+    "impactColor": "#d8c8ff",
+    "light": "#9a7cff",
+    "anim": "arcane_bolt_spin"
+  },
+  "bone_arrow": {
+    "texture": "arrow",
+    "speed": 165,
+    "radius": 3,
+    "lifetime": 2.2,
+    "knockback": 60,
+    "hitstun": 0.12,
+    "rotate": true,
+    "trailColor": null,
+    "impactColor": "#d9d2bd"
+  }
+}

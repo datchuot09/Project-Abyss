@@ -7,6 +7,7 @@ import { createServer, preview } from 'vite';
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { combatChecks } from './e2e/combat.mjs';
 
 const PROD = process.argv.includes('--prod');
 const shotsIdx = process.argv.indexOf('--shots');
@@ -135,6 +136,8 @@ try {
   const validation = await page.evaluate(() => window.__ABYSS__.game.scene.getScene('DungeonScene').dungeon.validation);
   check('Tilemap validation (spawns walkable + reachable)', validation.ok && validation.warnings.length === 0, `${validation.reachable}/${validation.walkable} tiles reachable`);
 
+  // Phase 1 movement checks must not be disturbed by enemy attacks.
+  await page.evaluate(() => (window.__ABYSS__.game.scene.getScene('DungeonScene').player.health.invulnerable = true));
   const start = await playerState();
   check('Player spawned on walkable tile', start.walkable, `(${start.x.toFixed(1)}, ${start.y.toFixed(1)})`);
   check('Camera shows player at spawn', start.inView);
@@ -154,12 +157,18 @@ try {
   const unstuck = await playerState();
   check('Player can move away from wall (not stuck)', unstuck.y - atWall.y > 10, `dy=${(unstuck.y - atWall.y).toFixed(1)}`);
 
-  // Diagonal speed equals straight speed
-  const d0 = await playerState();
-  await hold(['KeyS', 'KeyD'], 400);
-  const d1 = await playerState();
-  const diag = Math.hypot(d1.x - d0.x, d1.y - d0.y);
-  check('Diagonal movement normalised', diag < 0.4 * 92 * 1.15, `dist=${diag.toFixed(1)} in 0.4s (max ~${(0.4 * 92).toFixed(0)})`);
+  // Diagonal speed equals straight speed (measured at walk speed, before the run kicks in)
+  await page.waitForTimeout(250);
+  await page.keyboard.down('KeyS');
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(300);
+  const diag = await page.evaluate(() => {
+    const p = window.__ABYSS__.game.scene.getScene('DungeonScene').player;
+    return { v: Math.hypot(p.body.velocity.x, p.body.velocity.y), walk: p.moveSpeed };
+  });
+  await page.keyboard.up('KeyS');
+  await page.keyboard.up('KeyD');
+  check('Diagonal movement normalised', diag.v <= diag.walk * 1.02 && diag.v > diag.walk * 0.8, `|v|=${diag.v.toFixed(1)} (walk speed ${diag.walk})`);
 
   // Random walk: feet must always stay on walkable ground; camera must follow
   const dirs = [['KeyW'], ['KeyA'], ['KeyS'], ['KeyD'], ['KeyW', 'KeyA'], ['KeyS', 'KeyD'], ['KeyW', 'KeyD'], ['KeyS', 'KeyA'], ['ArrowRight'], ['ArrowDown']];
@@ -196,6 +205,11 @@ try {
   const fps = await page.evaluate(() => Math.round(window.__ABYSS__.game.loop.actualFps));
   check('Frame loop running', fps > 0, `${fps} FPS in headless Chromium (software rendering)`);
   await page.keyboard.press('F3');
+
+  // Phase 2: combat, AI, projectiles, death
+  console.log('--- Phase 2: combat ---');
+  await combatChecks({ page, check });
+  await shot('06-combat');
 
   // ESC -> menu, re-enter: scene restart must not leak listeners
   await page.keyboard.press('Escape');

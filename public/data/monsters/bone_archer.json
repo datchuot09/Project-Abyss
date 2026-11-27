@@ -1,0 +1,117 @@
+{
+  "id": "bone_archer",
+  "name": "Bone Archer",
+  "ai": "archer",
+  "description": "Restless bones that still remember the bow.",
+  "stats": {
+    "maxHp": 28,
+    "physicalDamage": 8,
+    "magicDamage": 0,
+    "defense": 1,
+    "movementSpeed": 50,
+    "critRate": 0.05,
+    "critMultiplier": 1.5,
+    "knockbackResist": 0
+  },
+  "sprite": {
+    "texture": "monster_bone_archer",
+    "frameWidth": 24,
+    "frameHeight": 24,
+    "columns": 18,
+    "originX": 0.5,
+    "originY": 0.9167
+  },
+  "body": {
+    "width": 10,
+    "height": 6,
+    "offsetX": 7,
+    "offsetY": 16
+  },
+  "shadow": {
+    "width": 12
+  },
+  "hpBar": {
+    "width": 14,
+    "offsetY": 24
+  },
+  "bloodColor": "#d9d2bd",
+  "animations": {
+    "idle": {
+      "frameRate": 5,
+      "repeat": -1,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "walk": {
+      "frameRate": 8,
+      "repeat": -1,
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "attack": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "hit": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        12
+      ]
+    },
+    "death": {
+      "frameRate": 8,
+      "repeat": 0,
+      "frames": [
+        13,
+        14,
+        15,
+        16,
+        17
+      ]
+    }
+  },
+  "perception": {
+    "detectRange": 150,
+    "loseRange": 230,
+    "reactionTime": 0.4,
+    "hearingRange": 32
+  },
+  "patrol": {
+    "radius": 32,
+    "speedMultiplier": 0.5,
+    "idleMin": 1.0,
+    "idleMax": 2.5
+  },
+  "attack": {
+    "minRange": 64,
+    "maxRange": 130,
+    "retreatRange": 52,
+    "aimTime": 0.65,
+    "recover": 0.4,
+    "cooldown": 1.5,
+    "projectile": "bone_arrow",
+    "multiplier": 1.0,
+    "type": "physical"
+  },
+  "skill": {
+    "id": "volley",
+    "every": 3,
+    "arrows": 3,
+    "spreadDeg": 16
+  }
+}

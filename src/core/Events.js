@@ -7,5 +7,12 @@ export const Events = Object.freeze({
   SCENE_READY: 'scene:ready',
   FLOOR_LOADED: 'floor:loaded',
   INPUT_DEVICE_CHANGED: 'input:device',
-  INPUT_BINDINGS_CHANGED: 'input:bindings'
+  INPUT_BINDINGS_CHANGED: 'input:bindings',
+  // Combat (Phase 2)
+  COMBAT_HIT: 'combat:hit', // { target, attacker, damage, crit, type, element, x, y, team }
+  COMBAT_EVADED: 'combat:evaded', // hit ignored by i-frames
+  ENTITY_DIED: 'entity:died', // { entity, team, killer }
+  PLAYER_HP_CHANGED: 'player:hp', // { current, max, delta }
+  PLAYER_DIED: 'player:died',
+  ENEMIES_CLEARED: 'enemies:cleared'
 });

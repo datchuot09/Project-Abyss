@@ -94,12 +94,27 @@ export const AssetManager = {
     return data;
   },
 
-  /** Build Phaser animations for a character from its data file. Idempotent. */
-  createCharacterAnimations(scene, character) {
-    const { texture, columns } = character.sprite;
-    for (const [state, def] of Object.entries(character.animations ?? {})) {
-      for (const [dir, row] of Object.entries(def.rows)) {
-        const key = `${character.id}_${state}_${dir}`;
+  getMonster(scene, id) {
+    const key = this.getManifest(scene).monsters?.[id];
+    const data = key && scene.cache.json.get(key);
+    if (!data) throw new Error(`[Assets] Monster "${id}" is not loaded.`);
+    return data;
+  },
+
+  getProjectiles(scene) {
+    return scene.cache.json.get('projectiles') ?? {};
+  },
+
+  /**
+   * Build Phaser animations from an entity data file. Idempotent.
+   * With `rows` (directional sheets): key = id_state_dir. Without: id_state.
+   */
+  createCharacterAnimations(scene, entity) {
+    const { texture, columns } = entity.sprite;
+    for (const [state, def] of Object.entries(entity.animations ?? {})) {
+      const variants = def.rows ? Object.entries(def.rows) : [[null, 0]];
+      for (const [dir, row] of variants) {
+        const key = dir ? `${entity.id}_${state}_${dir}` : `${entity.id}_${state}`;
         if (scene.anims.exists(key)) continue;
         scene.anims.create({
           key,
