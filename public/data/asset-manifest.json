@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "groups": {
+    "core": [
+      { "type": "bitmapFont", "key": "abyss_font", "textureURL": "assets/fonts/abyss_font.png", "fontDataURL": "assets/fonts/abyss_font.xml" },
+      { "type": "image", "key": "dungeon_tiles", "url": "assets/tilesets/dungeon_tiles.png" },
+      { "type": "spritesheet", "key": "player_wanderer", "url": "assets/characters/wanderer.png", "frameConfig": { "frameWidth": 24, "frameHeight": 24 } },
+      { "type": "spritesheet", "key": "torch", "url": "assets/effects/torch.png", "frameConfig": { "frameWidth": 16, "frameHeight": 16 } },
+      { "type": "image", "key": "light_glow", "url": "assets/effects/light_glow.png" },
+      { "type": "image", "key": "px_white", "url": "assets/effects/px_white.png" },
+      { "type": "image", "key": "px_ember", "url": "assets/effects/ember.png" },
+      { "type": "json", "key": "character_wanderer", "url": "data/characters/wanderer.json" }
+    ]
+  },
+  "characters": {
+    "wanderer": "character_wanderer"
+  },
+  "animations": {
+    "torch_burn": { "texture": "torch", "frames": [0, 1, 2, 3], "frameRate": 8, "repeat": -1 }
+  },
+  "floors": {
+    "test_chamber": {
+      "name": "The Sunken Antechamber",
+      "description": "Cold stone and colder silence. Something below is listening.",
+      "mapKey": "map_test_chamber",
+      "assets": [
+        { "type": "tilemapTiledJSON", "key": "map_test_chamber", "url": "data/dungeons/test_chamber.json" }
+      ]
+    }
+  }
+}
